@@ -1,4 +1,4 @@
-﻿package com.kwakwonjo.cryptoorderbook
+package com.kwakwonjo.cryptoorderbook
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -15,7 +15,9 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
             CryptoOrderBookTheme {
-                CryptoOrderBookNavHost()
+                CryptoOrderBookNavHost(
+                    onFinishRequest = ::finish,
+                )
             }
         }
     }
