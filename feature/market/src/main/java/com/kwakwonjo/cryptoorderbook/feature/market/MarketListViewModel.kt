@@ -1,69 +1,63 @@
-﻿package com.kwakwonjo.cryptoorderbook.feature.market
+package com.kwakwonjo.cryptoorderbook.feature.market
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kwakwonjo.cryptoorderbook.core.domain.usecase.ObserveMarketSummariesUseCase
-import com.kwakwonjo.cryptoorderbook.core.model.MarketSummary
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.stateIn
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class MarketListViewModel @Inject constructor(
     private val observeMarketSummariesUseCase: ObserveMarketSummariesUseCase,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<MarketListUiState>(MarketListUiState.Loading)
-    val uiState: StateFlow<MarketListUiState> = _uiState.asStateFlow()
+    private val refreshTrigger = MutableSharedFlow<Unit>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
 
-    private var pollingJob: Job? = null
-
-    fun startPolling() {
-        if (pollingJob?.isActive == true) return
-
-        pollingJob = viewModelScope.launch {
-            _uiState.value = MarketListUiState.Loading
-
-            observeMarketSummariesUseCase()
-                .catch { throwable ->
-                    _uiState.value = MarketListUiState.Error(
-                        throwable.message ?: DEFAULT_ERROR_MESSAGE,
-                    )
-                }
-                .collect { markets ->
-                    _uiState.value = MarketListUiState.Success(markets)
-                }
-        }
-    }
+    val uiState: StateFlow<MarketListContract.UiState> = refreshTrigger
+        .onStart { emit(Unit) }
+        .flatMapLatest { observeMarketUiState() }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+            initialValue = MarketListContract.UiState.Loading,
+        )
 
     fun retry() {
-        stopPolling()
-        startPolling()
+        refreshTrigger.tryEmit(Unit)
     }
 
-    fun stopPolling() {
-        pollingJob?.cancel()
-        pollingJob = null
-    }
-
-    override fun onCleared() {
-        stopPolling()
-        super.onCleared()
+    private fun observeMarketUiState(): Flow<MarketListContract.UiState> {
+        return observeMarketSummariesUseCase()
+            .map { markets ->
+                val state: MarketListContract.UiState = MarketListContract.UiState.Success(markets)
+                state
+            }
+            .onStart {
+                emit(MarketListContract.UiState.Loading)
+            }
+            .catch {
+                emit(MarketListContract.UiState.Error)
+            }
     }
 
     private companion object {
-        const val DEFAULT_ERROR_MESSAGE = "마켓 목록을 불러오지 못했습니다."
+        const val STOP_TIMEOUT_MILLIS = 5_000L
     }
 }
-
-sealed interface MarketListUiState {
-    data object Loading : MarketListUiState
-    data class Success(val markets: List<MarketSummary>) : MarketListUiState
-    data class Error(val message: String) : MarketListUiState
-}
-

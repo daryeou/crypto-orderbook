@@ -26,10 +26,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.kwakwonjo.cryptoorderbook.core.model.ConnectionState
 import com.kwakwonjo.cryptoorderbook.core.model.OrderBook
 import com.kwakwonjo.cryptoorderbook.core.model.OrderBookUnit
 import java.text.NumberFormat
@@ -38,7 +38,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OrderBookScreen(
-    uiState: OrderBookUiState,
+    uiState: OrderBookContract.UiState,
     onBack: () -> Unit,
     onRetry: () -> Unit,
 ) {
@@ -47,7 +47,9 @@ fun OrderBookScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        text = uiState.marketLabel.ifBlank { "호가창" },
+                        text = uiState.meta.marketLabel.ifBlank {
+                            stringResource(R.string.orderbook_title_fallback)
+                        },
                         maxLines = 1,
                     )
                 },
@@ -55,39 +57,37 @@ fun OrderBookScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "뒤로 가기",
+                            contentDescription = stringResource(R.string.orderbook_back),
                         )
                     }
                 },
             )
         }
     ) { innerPadding ->
-        val orderBook = uiState.orderBook
         val contentModifier = Modifier
             .fillMaxSize()
             .padding(innerPadding)
             .padding(horizontal = 16.dp)
 
-        when {
-            uiState.connectionState == ConnectionState.Error -> {
+        when (uiState) {
+            is OrderBookContract.UiState.Loading -> {
+                OrderBookLoadingState(
+                    modifier = contentModifier,
+                )
+            }
+
+            is OrderBookContract.UiState.Error -> {
                 OrderBookErrorState(
-                    errorMessage = uiState.errorMessage ?: DEFAULT_ERROR_MESSAGE,
+                    errorType = uiState.type,
+                    canRetry = uiState.canRetry,
                     onRetry = onRetry,
                     modifier = contentModifier,
                 )
             }
 
-            orderBook == null -> {
-                OrderBookLoadingState(
-                    connectionState = uiState.connectionState,
-                    modifier = contentModifier,
-                )
-            }
-
-            else -> {
+            is OrderBookContract.UiState.Success -> {
                 OrderBookContent(
                     uiState = uiState,
-                    orderBook = orderBook,
                     modifier = contentModifier,
                 )
             }
@@ -97,22 +97,14 @@ fun OrderBookScreen(
 
 @Composable
 private fun OrderBookLoadingState(
-    connectionState: ConnectionState,
     modifier: Modifier = Modifier,
 ) {
-    val message = when (connectionState) {
-        ConnectionState.Idle -> "호가 데이터를 준비 중입니다."
-        ConnectionState.Connecting -> "실시간 호가를 구독하는 중입니다."
-        ConnectionState.Connected -> "호가 데이터를 수신하는 중입니다."
-        ConnectionState.Error -> DEFAULT_ERROR_MESSAGE
-    }
-
     Box(
         modifier = modifier,
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = message,
+            text = stringResource(R.string.orderbook_loading),
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
         )
@@ -121,7 +113,8 @@ private fun OrderBookLoadingState(
 
 @Composable
 private fun OrderBookErrorState(
-    errorMessage: String,
+    errorType: OrderBookContract.ErrorType,
+    canRetry: Boolean,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -139,21 +132,28 @@ private fun OrderBookErrorState(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = "실시간 호가 연결 오류",
+                    text = stringResource(R.string.orderbook_error_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = errorMessage,
+                    text = stringResource(
+                        when (errorType) {
+                            OrderBookContract.ErrorType.NETWORK -> R.string.orderbook_error_message_network
+                            OrderBookContract.ErrorType.SOCKET -> R.string.orderbook_error_message_socket
+                        }
+                    ),
                     modifier = Modifier.padding(top = 8.dp),
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                 )
-                Button(
-                    onClick = onRetry,
-                    modifier = Modifier.padding(top = 16.dp),
-                ) {
-                    Text(text = "새로고침")
+                if (canRetry) {
+                    Button(
+                        onClick = onRetry,
+                        modifier = Modifier.padding(top = 16.dp),
+                    ) {
+                        Text(text = stringResource(R.string.orderbook_retry))
+                    }
                 }
             }
         }
@@ -162,27 +162,25 @@ private fun OrderBookErrorState(
 
 @Composable
 private fun OrderBookContent(
-    uiState: OrderBookUiState,
-    orderBook: OrderBook,
+    uiState: OrderBookContract.UiState.Success,
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
-            .verticalScroll(rememberScrollState()),
+        modifier = modifier.verticalScroll(rememberScrollState()),
     ) {
-        AskSection(orderBook = orderBook)
+        AskSection(orderBook = uiState.orderBook)
         CurrentPriceCard(
             currentPrice = uiState.currentPrice,
             signedChangeRate = uiState.signedChangeRate,
         )
-        BidSection(orderBook = orderBook)
+        BidSection(orderBook = uiState.orderBook)
     }
 }
 
 @Composable
 private fun AskSection(orderBook: OrderBook) {
     Text(
-        text = "매도 호가",
+        text = stringResource(R.string.orderbook_ask_section),
         modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.SemiBold,
@@ -223,7 +221,7 @@ private fun CurrentPriceCard(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text = "현재가",
+                text = stringResource(R.string.orderbook_current_price),
                 style = MaterialTheme.typography.labelLarge,
             )
             Text(
@@ -247,7 +245,7 @@ private fun CurrentPriceCard(
 @Composable
 private fun BidSection(orderBook: OrderBook) {
     Text(
-        text = "매수 호가",
+        text = stringResource(R.string.orderbook_bid_section),
         modifier = Modifier.padding(bottom = 8.dp),
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.SemiBold,
@@ -316,5 +314,3 @@ private fun OrderBookRow(
 private fun Double.toWonString(): String = NumberFormat.getNumberInstance(Locale.KOREA).format(this)
 
 private fun Double.toVolumeString(): String = String.format(Locale.KOREA, "%.4f", this)
-
-private const val DEFAULT_ERROR_MESSAGE = "WebSocket 연결에 실패했습니다."

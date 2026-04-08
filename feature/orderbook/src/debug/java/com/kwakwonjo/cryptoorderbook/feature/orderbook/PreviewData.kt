@@ -1,14 +1,14 @@
-﻿package com.kwakwonjo.cryptoorderbook.feature.orderbook
+package com.kwakwonjo.cryptoorderbook.feature.orderbook
 
-import com.kwakwonjo.cryptoorderbook.core.model.ConnectionState
 import com.kwakwonjo.cryptoorderbook.core.model.OrderBook
 import com.kwakwonjo.cryptoorderbook.core.model.OrderBookUnit
 
 internal object PreviewData {
-    val orderBookState = OrderBookUiState(
-        market = "KRW-BTC",
-        marketLabel = "비트코인 (KRW-BTC)",
-        connectionState = ConnectionState.Connected,
+    val orderBookState = OrderBookContract.UiState.Success(
+        meta = OrderBookContract.Meta(
+            market = "KRW-BTC",
+            marketLabel = "비트코인 (KRW-BTC)",
+        ),
         currentPrice = 148_956_000.0,
         signedChangeRate = 0.0031,
         orderBook = OrderBook(
@@ -29,5 +29,3 @@ internal object PreviewData {
         ),
     )
 }
-
-

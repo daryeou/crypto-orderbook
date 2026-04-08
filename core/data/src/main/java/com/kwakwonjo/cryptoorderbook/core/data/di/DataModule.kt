@@ -1,8 +1,10 @@
 ﻿package com.kwakwonjo.cryptoorderbook.core.data.di
 
 import com.kwakwonjo.cryptoorderbook.core.data.repository.MarketRepositoryImpl
+import com.kwakwonjo.cryptoorderbook.core.data.repository.NetworkStatusRepositoryImpl
 import com.kwakwonjo.cryptoorderbook.core.data.repository.OrderBookRepositoryImpl
 import com.kwakwonjo.cryptoorderbook.core.domain.repository.MarketRepository
+import com.kwakwonjo.cryptoorderbook.core.domain.repository.NetworkStatusRepository
 import com.kwakwonjo.cryptoorderbook.core.domain.repository.OrderBookRepository
 import dagger.Binds
 import dagger.Module
@@ -24,5 +26,11 @@ abstract class DataModule {
     abstract fun bindOrderBookRepository(
         impl: OrderBookRepositoryImpl,
     ): OrderBookRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindNetworkStatusRepository(
+        impl: NetworkStatusRepositoryImpl,
+    ): NetworkStatusRepository
 }
 

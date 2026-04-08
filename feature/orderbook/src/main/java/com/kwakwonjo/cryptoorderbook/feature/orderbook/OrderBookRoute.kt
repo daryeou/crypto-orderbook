@@ -1,13 +1,12 @@
 package com.kwakwonjo.cryptoorderbook.feature.orderbook
 
 import androidx.compose.runtime.Composable
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun OrderBookRoute(
     onBack: () -> Unit,
-    viewModel: OrderBookViewModel = hiltViewModel(),
+    viewModel: OrderBookViewModel,
 ) {
     val uiState = viewModel.uiState.collectAsStateWithLifecycle()
 

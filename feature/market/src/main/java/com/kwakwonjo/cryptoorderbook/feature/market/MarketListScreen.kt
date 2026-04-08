@@ -1,4 +1,4 @@
-﻿package com.kwakwonjo.cryptoorderbook.feature.market
+package com.kwakwonjo.cryptoorderbook.feature.market
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -32,7 +33,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MarketListScreen(
-    uiState: MarketListUiState,
+    uiState: MarketListContract.UiState,
     onMarketClick: (market: String, marketLabel: String) -> Unit,
     onRetry: () -> Unit,
 ) {
@@ -40,20 +41,19 @@ fun MarketListScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(text = "Upbit KRW 마켓")
+                    Text(text = stringResource(R.string.market_list_title))
                 }
             )
         }
     ) { innerPadding ->
         when (uiState) {
-            MarketListUiState.Loading -> LoadingContent(Modifier.padding(innerPadding))
-            is MarketListUiState.Error -> ErrorContent(
-                message = uiState.message,
+            MarketListContract.UiState.Loading -> LoadingContent(Modifier.padding(innerPadding))
+            MarketListContract.UiState.Error -> ErrorContent(
                 onRetry = onRetry,
                 modifier = Modifier.padding(innerPadding),
             )
 
-            is MarketListUiState.Success -> MarketListContent(
+            is MarketListContract.UiState.Success -> MarketListContent(
                 markets = uiState.markets,
                 onMarketClick = onMarketClick,
                 modifier = Modifier.padding(innerPadding),
@@ -71,7 +71,7 @@ private fun LoadingContent(modifier: Modifier = Modifier) {
     ) {
         CircularProgressIndicator()
         Text(
-            text = "마켓 정보를 불러오는 중입니다.",
+            text = stringResource(R.string.market_list_loading),
             modifier = Modifier.padding(top = 12.dp),
         )
     }
@@ -79,7 +79,6 @@ private fun LoadingContent(modifier: Modifier = Modifier) {
 
 @Composable
 private fun ErrorContent(
-    message: String,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -91,7 +90,7 @@ private fun ErrorContent(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = message,
+            text = stringResource(R.string.market_list_error),
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyLarge,
         )
@@ -99,7 +98,7 @@ private fun ErrorContent(
             onClick = onRetry,
             modifier = Modifier.padding(top = 16.dp),
         ) {
-            Text(text = "다시 시도")
+            Text(text = stringResource(R.string.market_list_retry))
         }
     }
 }
@@ -159,7 +158,11 @@ private fun MarketRow(
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "${market.englishName} · ${market.market}",
+                text = stringResource(
+                    R.string.market_list_row_subtitle,
+                    market.englishName,
+                    market.market,
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -188,4 +191,3 @@ private fun MarketRow(
 private fun Double.toWonString(): String = NumberFormat.getNumberInstance(Locale.KOREA).format(this)
 
 private fun Double.toPercentString(): String = String.format(Locale.KOREA, "%+.2f%%", this * 100)
-

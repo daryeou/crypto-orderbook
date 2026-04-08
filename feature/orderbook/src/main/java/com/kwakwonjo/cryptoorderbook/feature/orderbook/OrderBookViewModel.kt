@@ -2,116 +2,152 @@ package com.kwakwonjo.cryptoorderbook.feature.orderbook
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kwakwonjo.cryptoorderbook.core.domain.usecase.IsNetworkAvailableUseCase
 import com.kwakwonjo.cryptoorderbook.core.domain.usecase.ObserveOrderBookUseCase
 import com.kwakwonjo.cryptoorderbook.core.model.ConnectionState
 import com.kwakwonjo.cryptoorderbook.core.model.OrderBook
+import com.kwakwonjo.cryptoorderbook.core.model.OrderBookPayload
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.conflate
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.scan
+import kotlinx.coroutines.flow.stateIn
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel(assistedFactory = OrderBookViewModel.Factory::class)
 class OrderBookViewModel @AssistedInject constructor(
     private val observeOrderBookUseCase: ObserveOrderBookUseCase,
+    private val isNetworkAvailableUseCase: IsNetworkAvailableUseCase,
     @Assisted private val navKey: OrderBookNavKey,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(connectingState())
-    val uiState: StateFlow<OrderBookUiState> = _uiState.asStateFlow()
+    private val meta = OrderBookContract.Meta(
+        market = navKey.market,
+        marketLabel = navKey.label,
+    )
 
-    private var observeJob: Job? = null
+    private val refreshTrigger = MutableSharedFlow<Unit>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
 
-    init {
-        observeOrderBook()
-    }
-
-    fun retry() {
-        observeOrderBook(resetState = true)
-    }
-
-    override fun onCleared() {
-        observeJob?.cancel()
-        super.onCleared()
-    }
-
-    private fun observeOrderBook(resetState: Boolean = false) {
-        observeJob?.cancel()
-        if (resetState) {
-            _uiState.value = connectingState()
-        }
-
-        observeJob = viewModelScope.launch {
-            observeOrderBookUseCase(navKey.market)
-                .conflate()
-                .catch { throwable ->
-                    _uiState.value = errorState(
-                        throwable.message ?: DEFAULT_ERROR_MESSAGE,
+    val uiState: StateFlow<OrderBookContract.UiState> = refreshTrigger
+        .onStart { emit(Unit) }
+        .flatMapLatest {
+            if (!isNetworkAvailableUseCase()) {
+                flowOf(
+                    OrderBookContract.UiState.Error(
+                        meta = meta,
+                        type = OrderBookContract.ErrorType.NETWORK,
                     )
-                }
-                .collect { payload ->
-                    _uiState.value = when (payload.connectionState) {
-                        ConnectionState.Error -> errorState(
-                            payload.errorMessage ?: DEFAULT_ERROR_MESSAGE,
-                        )
-
-                        ConnectionState.Connecting -> connectingState()
-                        ConnectionState.Idle -> idleState()
-                        ConnectionState.Connected -> _uiState.value.copy(
-                            market = navKey.market,
-                            marketLabel = navKey.label,
-                            connectionState = ConnectionState.Connected,
-                            orderBook = payload.orderBook ?: _uiState.value.orderBook,
-                            currentPrice = payload.ticker?.tradePrice ?: _uiState.value.currentPrice,
-                            signedChangeRate = payload.ticker?.signedChangeRate ?: _uiState.value.signedChangeRate,
-                            errorMessage = null,
+                )
+            } else {
+                observeOrderBookUseCase(navKey.market)
+                    .conflate()
+                    .scan(OrderBookAccumulator(meta = meta)) { accumulator, payload ->
+                        accumulator.reduce(
+                            payload = payload,
+                            isNetworkAvailable = isNetworkAvailableUseCase(),
                         )
                     }
-                }
+                    .map(OrderBookAccumulator::toUiState)
+                    .onStart {
+                        emit(OrderBookContract.UiState.Loading(meta))
+                    }
+                    .catch {
+                        emit(
+                            OrderBookContract.UiState.Error(
+                                meta = meta,
+                                type = resolveErrorType(),
+                            )
+                        )
+                    }
+            }
         }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+            initialValue = OrderBookContract.UiState.Loading(meta),
+        )
+
+    fun retry() {
+        refreshTrigger.tryEmit(Unit)
     }
-
-    private fun idleState(): OrderBookUiState = OrderBookUiState(
-        market = navKey.market,
-        marketLabel = navKey.label,
-        connectionState = ConnectionState.Idle,
-    )
-
-    private fun connectingState(): OrderBookUiState = OrderBookUiState(
-        market = navKey.market,
-        marketLabel = navKey.label,
-        connectionState = ConnectionState.Connecting,
-    )
-
-    private fun errorState(message: String): OrderBookUiState = OrderBookUiState(
-        market = navKey.market,
-        marketLabel = navKey.label,
-        connectionState = ConnectionState.Error,
-        errorMessage = message,
-    )
 
     @AssistedFactory
     interface Factory {
         fun create(navKey: OrderBookNavKey): OrderBookViewModel
     }
 
+    private fun resolveErrorType(): OrderBookContract.ErrorType {
+        return if (isNetworkAvailableUseCase()) {
+            OrderBookContract.ErrorType.SOCKET
+        } else {
+            OrderBookContract.ErrorType.NETWORK
+        }
+    }
+
+    private data class OrderBookAccumulator(
+        val meta: OrderBookContract.Meta,
+        val orderBook: OrderBook? = null,
+        val currentPrice: Double? = null,
+        val signedChangeRate: Double? = null,
+        val errorType: OrderBookContract.ErrorType? = null,
+    ) {
+        fun reduce(
+            payload: OrderBookPayload,
+            isNetworkAvailable: Boolean,
+        ): OrderBookAccumulator = when (payload.connectionState) {
+            ConnectionState.Error -> copy(
+                errorType = if (isNetworkAvailable) {
+                    OrderBookContract.ErrorType.SOCKET
+                } else {
+                    OrderBookContract.ErrorType.NETWORK
+                },
+            )
+
+            else -> copy(
+                orderBook = payload.orderBook ?: orderBook,
+                currentPrice = payload.ticker?.tradePrice ?: currentPrice,
+                signedChangeRate = payload.ticker?.signedChangeRate ?: signedChangeRate,
+                errorType = null,
+            )
+        }
+
+        fun toUiState(): OrderBookContract.UiState {
+            return when {
+                errorType != null -> OrderBookContract.UiState.Error(
+                    meta = meta,
+                    type = errorType,
+                )
+
+                orderBook != null -> OrderBookContract.UiState.Success(
+                    meta = meta,
+                    orderBook = orderBook,
+                    currentPrice = currentPrice,
+                    signedChangeRate = signedChangeRate,
+                )
+
+                else -> OrderBookContract.UiState.Loading(meta)
+            }
+        }
+    }
+
     private companion object {
-        const val DEFAULT_ERROR_MESSAGE = "WebSocket 연결에 실패했습니다."
+        const val STOP_TIMEOUT_MILLIS = 5_000L
     }
 }
-
-data class OrderBookUiState(
-    val market: String = "",
-    val marketLabel: String = "",
-    val connectionState: ConnectionState = ConnectionState.Idle,
-    val currentPrice: Double? = null,
-    val signedChangeRate: Double? = null,
-    val orderBook: OrderBook? = null,
-    val errorMessage: String? = null,
-)

@@ -1,8 +1,6 @@
-﻿package com.kwakwonjo.cryptoorderbook.feature.market
+package com.kwakwonjo.cryptoorderbook.feature.market
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
@@ -13,20 +11,9 @@ fun MarketListRoute(
 ) {
     val uiState = viewModel.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(viewModel) {
-        viewModel.startPolling()
-    }
-
-    DisposableEffect(viewModel) {
-        onDispose {
-            viewModel.stopPolling()
-        }
-    }
-
     MarketListScreen(
         uiState = uiState.value,
         onMarketClick = onMarketClick,
         onRetry = viewModel::retry,
     )
 }
-
