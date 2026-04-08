@@ -54,21 +54,24 @@ app
 - ViewModel 인터페이스 대신 stateless `Screen`과 Hilt `Route`를 분리해 preview/test seam을 확보했습니다.
 
 ### 상태 관리
-- 종목 리스트: `MarketListUiState` sealed interface
-- 호가창: `OrderBookUiState` data class + `ConnectionState`
-- 각 화면은 `Route(hiltViewModel())`와 `Screen(uiState, onAction...)`로 분리
-- `MarketListViewModel`은 domain use case를 통해 REST polling을 수행하고, `OrderBookViewModel`은 WebSocket 구독을 수행합니다.
+- 종목 리스트와 호가창 모두 `*Contract.UiState` sealed interface를 사용합니다.
+- 각 화면은 `Route`와 `Screen(uiState, onAction...)`로 분리하고, `Route`는 상태 수집과 액션 전달만 담당합니다.
+- 두 ViewModel 모두 `refreshTrigger + flatMapLatest + stateIn(WhileSubscribed)` 패턴으로 수집을 시작하고 중단합니다.
+- `retry()`는 trigger 값만 갱신하고, 이전 upstream 취소와 새 구독 시작은 `flatMapLatest`에 맡깁니다.
 
 ### WebSocket 처리 전략
 - `core:network`에서 OkHttp WebSocket을 `callbackFlow`로 감쌌습니다.
 - `core:data`에서 `orderbook`과 `ticker` frame을 병합해 단일 `OrderBookPayload`로 변환합니다.
-- 화면 이탈 시 `OrderBookViewModel.stop()`으로 구독을 해제합니다.
+- `OrderBookViewModel`은 Navigation3 key를 assisted injection으로 받아 같은 종목 기준으로 `retry()` 재구독을 수행합니다.
+- `orderbook`과 `ticker`가 분리되어 와도 ViewModel reducer가 이전 값을 누적해 하나의 `Success` 상태로 합칩니다.
+- WebSocket 오류 시 호가창은 상단 배너 대신 전체 에러 화면을 보여주고, 사용자가 `새로고침`을 눌러 다시 연결합니다.
 - 백프레셔는 ViewModel 수집 지점에서 `conflate()`를 적용했습니다.
 
 ### Navigation 전략
 - 앱 네비게이션은 `Navigation3`의 `rememberNavBackStack`과 `NavDisplay`를 사용합니다.
 - destination key는 `@Serializable` + `NavKey`로 구성해 구성 변경 시 back stack을 복원합니다.
 - `rememberSaveableStateHolderNavEntryDecorator()`와 `rememberViewModelStoreNavEntryDecorator()`를 함께 사용해 상태와 ViewModel 스코프를 유지합니다.
+- `OrderBook`는 feature 모듈의 `OrderBookNavKey`를 `creationCallback`으로 ViewModel factory에 전달해 `SavedStateHandle` 없이 인수를 주입합니다.
 - 의존성은 `navigation3-runtime`, `navigation3-ui`, `lifecycle-viewmodel-navigation3` 조합을 사용하고, `navigation-compose`는 포함하지 않았습니다.
 
 ## 주요 라이브러리
@@ -91,6 +94,7 @@ app
 - 호가창 중앙의 현재가는 WebSocket `ticker.trade_price`를 사용합니다.
 - 호가 수량은 기본 15단(`KRW-BTC.15`)으로 구독합니다.
 - 호가창은 과제 요구사항에 맞춰 REST polling 없이 WebSocket만 사용합니다.
+- refresh 시 `OrderBook`와 `MarketList` 모두 이전 표시 상태를 버리고 `Loading`부터 다시 시작합니다.
 - Compose Preview는 `src/debug`에만 두어 release 산출물에서 제외합니다.
 - ViewModel 인터페이스는 도입하지 않았습니다. 대신 fake repository와 stateless screen으로 테스트성을 확보했습니다.
 
@@ -115,6 +119,10 @@ feature/
 
 ## 관련 문서
 
-- [`ROADMAP.md`](./ROADMAP.md) — 미구현 항목과 테스트 전략
-- [`RETROSPECTIVE.md`](./RETROSPECTIVE.md) — AI 도구 활용 회고
+- [`docs/DEVELOPMENT_PLAN.md`](./docs/DEVELOPMENT_PLAN.md) — 재구성한 개발 기획 문서
 - [`AGENTS.md`](./AGENTS.md) — 이 저장소에서 AI 에이전트 작업 규칙
+## 최근 조정 메모
+
+- `OrderBookViewModel`, `MarketListViewModel`의 refresh trigger는 `MutableStateFlow<Int>` 대신 `MutableSharedFlow<Unit>`를 사용한다. 재시도는 값 비교가 아니라 이벤트 의미가 더 맞고, `StateFlow<Unit>`은 같은 값 재방출이 불가능하기 때문이다.
+- `OrderBookContract.UiState.Error`는 문자열 메시지 대신 `ErrorType(NETWORK, SOCKET)`만 가진다. 실제 안내 문구와 버튼 노출 여부는 화면에서 `strings.xml`과 `type`으로 결정한다.
+- `OrderBook` 진입 시 네트워크가 없으면 WebSocket 구독 전에 `NETWORK` 에러를 표시하고, 소켓 통신 실패일 때만 새로고침 버튼을 노출한다.
