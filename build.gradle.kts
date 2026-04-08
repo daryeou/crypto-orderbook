@@ -1,4 +1,4 @@
-val applicationIdValue by extra("com.kmwh.cryptoorderbook")
+﻿val applicationIdValue by extra("com.kwakwonjo.cryptoorderbook")
 val compileSdkValue by extra(36)
 val targetSdkValue by extra(36)
 val minSdkValue by extra(26)
@@ -14,4 +14,5 @@ plugins {
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.kapt) apply false
 }
+
 
