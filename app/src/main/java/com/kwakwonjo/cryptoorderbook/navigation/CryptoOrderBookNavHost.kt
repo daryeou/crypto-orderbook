@@ -4,13 +4,16 @@ import android.app.Activity
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import com.kwakwonjo.cryptoorderbook.feature.market.MarketListRoute
+import com.kwakwonjo.cryptoorderbook.feature.orderbook.OrderBookNavKey
 import com.kwakwonjo.cryptoorderbook.feature.orderbook.OrderBookRoute
+import com.kwakwonjo.cryptoorderbook.feature.orderbook.OrderBookViewModel
 
 @Composable
 fun CryptoOrderBookNavHost(
@@ -38,7 +41,7 @@ fun CryptoOrderBookNavHost(
                 MarketListRoute(
                     onMarketClick = { market, marketLabel ->
                         backStack.add(
-                            AppDestination.OrderBook(
+                            OrderBookNavKey(
                                 market = market,
                                 label = marketLabel,
                             )
@@ -47,11 +50,14 @@ fun CryptoOrderBookNavHost(
                 )
             }
 
-            entry<AppDestination.OrderBook> { key ->
+            entry<OrderBookNavKey> { key ->
+                val viewModel = hiltViewModel<OrderBookViewModel, OrderBookViewModel.Factory>(
+                    creationCallback = { factory -> factory.create(key) },
+                )
+
                 OrderBookRoute(
-                    market = key.market,
-                    marketLabel = key.label,
                     onBack = { backStack.removeLastOrNull() },
+                    viewModel = viewModel,
                 )
             }
         },
