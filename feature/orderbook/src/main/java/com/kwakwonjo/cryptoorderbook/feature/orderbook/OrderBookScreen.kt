@@ -1,4 +1,4 @@
-﻿package com.kwakwonjo.cryptoorderbook.feature.orderbook
+package com.kwakwonjo.cryptoorderbook.feature.orderbook
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -62,83 +62,120 @@ fun OrderBookScreen(
             )
         }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState()),
-        ) {
-            ConnectionBanner(
-                connectionState = uiState.connectionState,
-                errorMessage = uiState.errorMessage,
-                onRetry = onRetry,
-            )
+        val orderBook = uiState.orderBook
+        val contentModifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding)
+            .padding(horizontal = 16.dp)
 
-            val orderBook = uiState.orderBook
-            if (orderBook == null && uiState.connectionState == ConnectionState.Connecting) {
-                Text(
-                    text = "실시간 호가를 구독하는 중입니다.",
-                    modifier = Modifier.padding(top = 24.dp),
+        when {
+            uiState.connectionState == ConnectionState.Error -> {
+                OrderBookErrorState(
+                    errorMessage = uiState.errorMessage ?: DEFAULT_ERROR_MESSAGE,
+                    onRetry = onRetry,
+                    modifier = contentModifier,
                 )
-                return@Column
             }
 
-            orderBook?.let {
-                AskSection(orderBook = it)
-                CurrentPriceCard(
-                    currentPrice = uiState.currentPrice,
-                    signedChangeRate = uiState.signedChangeRate,
+            orderBook == null -> {
+                OrderBookLoadingState(
+                    connectionState = uiState.connectionState,
+                    modifier = contentModifier,
                 )
-                BidSection(orderBook = it)
+            }
+
+            else -> {
+                OrderBookContent(
+                    uiState = uiState,
+                    orderBook = orderBook,
+                    modifier = contentModifier,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun ConnectionBanner(
+private fun OrderBookLoadingState(
     connectionState: ConnectionState,
-    errorMessage: String?,
-    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val (label, containerColor) = when (connectionState) {
-        ConnectionState.Idle -> "대기 중" to MaterialTheme.colorScheme.surfaceVariant
-        ConnectionState.Connecting -> "연결 중" to Color(0xFFFFF3E0)
-        ConnectionState.Connected -> "실시간 연결됨" to Color(0xFFE8F5E9)
-        ConnectionState.Error -> "연결 오류" to Color(0xFFFFEBEE)
+    val message = when (connectionState) {
+        ConnectionState.Idle -> "호가 데이터를 준비 중입니다."
+        ConnectionState.Connecting -> "실시간 호가를 구독하는 중입니다."
+        ConnectionState.Connected -> "호가 데이터를 수신하는 중입니다."
+        ConnectionState.Error -> DEFAULT_ERROR_MESSAGE
     }
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 12.dp),
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(containerColor)
-                .padding(16.dp),
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun OrderBookErrorState(
+    errorMessage: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center,
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-            )
-            if (errorMessage != null) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = "실시간 호가 연결 오류",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
                 Text(
                     text = errorMessage,
-                    modifier = Modifier.padding(top = 6.dp),
+                    modifier = Modifier.padding(top = 8.dp),
                     style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
                 )
                 Button(
                     onClick = onRetry,
-                    modifier = Modifier.padding(top = 12.dp),
+                    modifier = Modifier.padding(top = 16.dp),
                 ) {
-                    Text(text = "재연결")
+                    Text(text = "새로고침")
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun OrderBookContent(
+    uiState: OrderBookUiState,
+    orderBook: OrderBook,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .verticalScroll(rememberScrollState()),
+    ) {
+        AskSection(orderBook = orderBook)
+        CurrentPriceCard(
+            currentPrice = uiState.currentPrice,
+            signedChangeRate = uiState.signedChangeRate,
+        )
+        BidSection(orderBook = orderBook)
     }
 }
 
@@ -280,4 +317,4 @@ private fun Double.toWonString(): String = NumberFormat.getNumberInstance(Locale
 
 private fun Double.toVolumeString(): String = String.format(Locale.KOREA, "%.4f", this)
 
-
+private const val DEFAULT_ERROR_MESSAGE = "WebSocket 연결에 실패했습니다."
