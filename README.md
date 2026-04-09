@@ -1,14 +1,14 @@
 # Crypto Order Book (Android)
 
-Upbit 공개 API를 이용해 KRW 마켓 종목 리스트와 실시간 호가창을 보여주는 Android 앱입니다.
+Upbit 공개 API를 사용해 KRW 마켓 종목 리스트와 실시간 호가창을 제공하는 Android 앱입니다.
 
 ## 빌드 & 실행
 
 ### 환경
-- **최소 SDK**: 26
-- **타겟 SDK**: 36
-- **JDK**: 21
-- **빌드 도구**: Gradle Wrapper 8.13
+- 최소 SDK: 26
+- 타깃 SDK: 36
+- JDK: 21
+- 빌드 도구: Gradle Wrapper 8.13
 
 ### 명령
 
@@ -21,96 +21,194 @@ Windows에서는 `gradlew.bat`를 사용합니다.
 
 ## 거래소 선택 근거
 
-후보 검토:
+이 과제에서 비교한 기준은 다음과 같습니다.
 
-| 거래소 | WebSocket 호가 | 한국 접근성 | 문서 품질 | 비고 |
-|---|---|---|---|---|
-| Upbit | ✅ | ✅ | 양호 | KRW 마켓 제공 |
-| Bithumb | ✅ | ✅ | 보통 | 응답 구조 해석 비용이 더 큼 |
-| Binance | ✅ | ⚠️ | 우수 | 국내 접근성과 제출 검증 환경이 불리할 수 있음 |
+- 종목 리스트 조회 방식이 단순한가
+- 호가 WebSocket을 안정적으로 지원하는가
+- 현재가를 어떤 API 조합으로 채워야 하는지 명확한가
+- KRW 마켓을 직접 제공하는가
+- 문서와 응답 구조 해석 비용이 낮은가
+- 국내 환경에서 바로 검증하기 쉬운가
 
-**선택**: Upbit
+| 거래소 | 종목 리스트 조회 | 호가 WebSocket | 현재가 채우기 방식 | KRW 마켓 | 문서 / 응답 해석 난이도 | 국내 환경 검증 |
+|---|---|---|---|---|---|---|
+| Upbit | `market/all` + `ticker` 조합이 단순함 | 지원 | `orderbook` + `ticker` 역할 분리가 명확함 | 제공 | 낮음 | 쉬움 |
+| Bithumb | KRW 친화적이지만 응답 구조 해석 비용이 더 큼 | 지원 | 현재가/호가 조합은 가능하지만 응답 형태 해석 부담이 있음 | 제공 | 중간 | 쉬움 |
+| Binance | 문서는 풍부하지만 과제 관점에선 심볼 체계와 시장 구성이 더 큼 | 지원 | 조합은 유연하지만 과제 범위에 비해 복잡도 높음 | 직접 제공하지 않음 | 중간 | 상대적으로 불리 |
 
-**이유**
-- 한국 환경에서 바로 검증하기 쉽습니다.
-- REST와 WebSocket 문서가 분리되어 있어 종목 리스트와 호가창 역할을 명확히 나눌 수 있습니다.
-- `market/all`, `ticker`, `orderbook`, `ticker` 조합으로 과제의 Must-have를 단순한 구조로 충족할 수 있습니다.
+선택: Upbit
+
+선택 이유:
+- `market/all + ticker + orderbook + ticker` 조합이 명확해 과제 요구사항과 바로 연결됩니다.
+- KRW 마켓을 직접 제공하므로 종목 리스트와 호가창 검증이 직관적입니다.
+- 국내 환경에서 WebSocket과 REST를 모두 바로 테스트하기 쉽습니다.
+- 문서와 응답 구조가 비교적 단순해 구현 및 회고 문서화에 유리합니다.
+
+사용 API:
+- 종목 메타데이터: `GET /v1/market/all`
+- 현재가 / 24h 변동률: `GET /v1/ticker`
+- 실시간 호가: `wss://api.upbit.com/websocket/v1` `orderbook`
+- 실시간 현재가: `wss://api.upbit.com/websocket/v1` `ticker`
 
 ## 아키텍처
 
-```
+이 프로젝트는 과제 규모에 맞춘 `Clean Architecture + MVVM + StateFlow`를 사용합니다.
+
+```text
 app
-  └─ feature:market / feature:orderbook
-       └─ core:domain
-            └─ core:data
-                 ├─ core:network
-                 └─ core:model
+  -> feature:market / feature:orderbook
+       -> core:domain
+            -> core:data
+                 -> core:network
+                 -> core:model
 ```
 
-### 선택 근거
-- 과제 규모에 맞춰 `Clean Architecture + MVVM + StateFlow`를 유지했습니다.
-- 이전에 진행했던 MVVM 기반 토이 프로젝트의 모듈 분리 경험은 참고하되, 설명 부담이 큰 `core:designsystem`, `core:common` 같은 확장 레이어는 도입하지 않았습니다.
-- Repository interface와 UseCase를 `core:domain`으로 올려서 `data -> domain -> viewmodel` 의존 방향을 고정했습니다.
-- ViewModel 인터페이스 대신 stateless `Screen`과 Hilt `Route`를 분리해 preview/test seam을 확보했습니다.
+### 모듈 역할
+
+- `app`: Application, Activity, Navigation3 NavHost, 전역 오프라인 UI
+- `core:model`: 순수 모델
+- `core:domain`: repository contract, use case
+- `core:network`: REST / WebSocket DTO와 클라이언트
+- `core:data`: repository 구현과 Hilt binding
+- `feature:market`: 종목 리스트 화면과 ViewModel
+- `feature:orderbook`: 호가창 화면과 ViewModel
 
 ### 상태 관리
-- 종목 리스트와 호가창 모두 `*Contract.UiState` sealed interface를 사용합니다.
-- 각 화면은 `Route`와 `Screen(uiState, onAction...)`로 분리하고, `Route`는 상태 수집과 액션 전달만 담당합니다.
-- 두 ViewModel 모두 `refreshTrigger + flatMapLatest + stateIn(WhileSubscribed)` 패턴으로 수집을 시작하고 중단합니다.
-- `retry()`는 trigger 값만 갱신하고, 이전 upstream 취소와 새 구독 시작은 `flatMapLatest`에 맡깁니다.
 
-### WebSocket 처리 전략
-- `core:network`에서 OkHttp WebSocket을 `callbackFlow`로 감쌌습니다.
-- `core:data`에서 `orderbook`과 `ticker` frame을 병합해 단일 `OrderBookPayload`로 변환합니다.
-- `OrderBookViewModel`은 Navigation3 key를 assisted injection으로 받아 같은 종목 기준으로 `retry()` 재구독을 수행합니다.
-- `orderbook`과 `ticker`가 분리되어 와도 ViewModel reducer가 이전 값을 누적해 하나의 `Success` 상태로 합칩니다.
-- WebSocket 오류 시 호가창은 상단 배너 대신 전체 에러 화면을 보여주고, 사용자가 `새로고침`을 눌러 다시 연결합니다.
-- 백프레셔는 ViewModel 수집 지점에서 `conflate()`를 적용했습니다.
+- 각 화면은 `*Contract.UiState` sealed interface를 사용합니다.
+- `Route`와 `Screen`을 분리합니다.
+  - `Route`: Hilt 주입, 상태 수집, 액션 전달
+  - `Screen`: 순수 UI 렌더링
+- `MarketListViewModel`과 `OrderBookViewModel`은 `SharedFlow<Unit> + flatMapLatest + stateIn(WhileSubscribed)` 패턴으로 새로고침과 수집 생명주기를 관리합니다.
 
-### Navigation 전략
-- 앱 네비게이션은 `Navigation3`의 `rememberNavBackStack`과 `NavDisplay`를 사용합니다.
-- destination key는 `@Serializable` + `NavKey`로 구성해 구성 변경 시 back stack을 복원합니다.
-- `rememberSaveableStateHolderNavEntryDecorator()`와 `rememberViewModelStoreNavEntryDecorator()`를 함께 사용해 상태와 ViewModel 스코프를 유지합니다.
-- `OrderBook`는 feature 모듈의 `OrderBookNavKey`를 `creationCallback`으로 ViewModel factory에 전달해 `SavedStateHandle` 없이 인수를 주입합니다.
-- 의존성은 `navigation3-runtime`, `navigation3-ui`, `lifecycle-viewmodel-navigation3` 조합을 사용하고, `navigation-compose`는 포함하지 않았습니다.
+### Navigation
+
+- `Navigation3`의 `rememberNavBackStack`, `NavDisplay`를 사용합니다.
+- `rememberSaveableStateHolderNavEntryDecorator()`와 `rememberViewModelStoreNavEntryDecorator()`로 엔트리 단위 저장 상태와 ViewModel 스코프를 분리합니다.
+- `OrderBook`는 `OrderBookNavKey`를 Hilt assisted injection으로 ViewModel에 전달합니다.
+
+## 구현 순서와 검증 흐름
+
+이 프로젝트는 화면을 처음부터 완성형으로 만들기보다, 최소 동작을 먼저 확인한 뒤 구조와 정책을 보강하는 순서로 진행했습니다.
+
+### 1. 거래소/API 검토
+- 작업: Upbit REST / WebSocket 스펙 확인, 거래소 비교 기준 정리
+- 목적: 과제 범위에서 구현 비용이 가장 낮은 거래소 선택
+- 검증: REST 호출 가능 여부, WebSocket 호가/현재가 지원 여부 확인
+
+### 2. 앱 구조 구성
+- 작업: 멀티 모듈 구조, Navigation3, Hilt 기반 진입 구조 구성
+- 목적: 이후 기능을 얹을 최소 실행 구조 확보
+- 검증: 앱 빌드, 화면 이동, ViewModel 주입 동작 확인
+
+### 3. 종목 리스트 연결
+- 작업: `market/all` + `ticker` 기반 종목 리스트 화면 구현
+- 목적: Must-have 1 우선 달성
+- 검증: KRW 마켓 목록, 현재가, 24시간 변동률 표시 확인
+
+### 4. 호가창 최소 동작 구현
+- 작업: WebSocket `orderbook` + `ticker` 병합, 현재가 포함 호가창 구현
+- 목적: Must-have 2, 3의 핵심 동작 먼저 확보
+- 검증: 종목 선택 후 실시간 호가/현재가 갱신 확인
+
+### 5. 상태 정책 정리
+- 작업: contract 기반 `UiState`, use case, assisted injection, 오프라인 정책 정리
+- 목적: 프로토타입 수준 동작을 유지하면서 구조와 책임 분리 강화
+- 검증: 화면 상태 전이, 재시도, 연결 복구 동작 확인
+
+### 6. 테스트와 문서 보강
+- 작업: ViewModel / repository 테스트 추가, README / ROADMAP / RETROSPECTIVE 갱신
+- 목적: 구현뿐 아니라 검증 과정과 설계 판단을 제출물에 반영
+- 검증: `testDebugUnitTest`, `assembleDebug` 통과
+
+요약하면 `거래소/API 검토 -> 앱 구조 구성 -> 기능 연결 -> 상태 정책 정리 -> 테스트 및 문서 보강` 흐름입니다.
+
+## 데이터 흐름
+
+### 종목 리스트
+
+```mermaid
+flowchart LR
+    A["Upbit REST<br/>market/all + ticker"] --> B["MarketRepository"]
+    B --> C["ObserveMarketSummariesUseCase"]
+    C --> D["MarketListViewModel"]
+    D --> E["MarketListContract.UiState"]
+    E --> F["MarketListScreen"]
+```
+
+### 호가창
+
+```mermaid
+flowchart LR
+    A["Upbit WebSocket<br/>orderbook"] --> C["OrderBookRepository"]
+    B["Upbit WebSocket<br/>ticker"] --> C
+    C --> D["ObserveOrderBookUseCase"]
+    D --> E["OrderBookViewModel"]
+    E --> F["OrderBookContract.UiState"]
+    F --> G["OrderBookScreen"]
+```
+
+### 전역 네트워크 상태
+
+```mermaid
+flowchart LR
+    A["ConnectivityManager"] --> B["NetworkStatusRepository"]
+    B --> C["ObserveConnectivityUseCase"]
+    C --> D["AppRootViewModel"]
+    D --> E["CryptoOrderBookApp"]
+    C --> F["MarketListViewModel"]
+    C --> G["OrderBookViewModel"]
+```
+
+## 오프라인 처리 정책
+
+- 오프라인은 화면 에러가 아니라 앱 전역 상태로 다룹니다.
+- `NetworkStatusRepository.observeConnectivity()`가 `ConnectivityStatus`를 제공합니다.
+- 연결 여부는 `activeNetwork` 존재만으로 판단하지 않고, `NetworkCapabilities`의 `NET_CAPABILITY_INTERNET`와 `NET_CAPABILITY_VALIDATED`를 함께 확인합니다.
+  - `NET_CAPABILITY_INTERNET`: 인터넷용 네트워크인지
+  - `NET_CAPABILITY_VALIDATED`: 실제 외부 인터넷 연결이 검증됐는지
+- `MainActivity -> CryptoOrderBookApp` 루트에서 연결 상태를 관찰합니다.
+- 연결이 끊기면:
+  - Snackbar를 1회 표시합니다.
+  - 반투명 오버레이와 중앙 로딩 인디케이터를 띄웁니다.
+  - 현재 화면의 마지막 상태는 유지하고, REST polling / WebSocket 갱신만 중단합니다.
+- 연결이 복구되면 활성 화면이 자동으로 재조회 또는 재구독합니다.
+
+화면별 에러 정책:
+- `MarketList`: 온라인 상태에서 REST polling이 실패할 때만 `Error`
+- `OrderBook`: 온라인 상태에서 WebSocket 연결이 실패할 때만 `Error(SOCKET)`
 
 ## 주요 라이브러리
 
 | 라이브러리 | 용도 | 선택 근거 |
 |---|---|---|
 | Jetpack Compose | UI | 과제 필수, Route/Screen 분리에 적합 |
-| Navigation3 | 화면 이동 | serializable key 기반 back stack과 entry 단위 상태 복원에 적합 |
-| Hilt | DI | 모듈 간 repository/network binding을 단순화 |
-| Retrofit | REST API | Upbit REST 엔드포인트 선언이 간결함 |
-| OkHttp WebSocket | 실시간 호가/현재가 | WebSocket 제어와 `callbackFlow` 래핑이 쉬움 |
-| kotlinx.serialization | JSON 직렬화 | REST/WS 응답 모델에 동일하게 적용 가능 |
+| Navigation3 | 화면 이동 | serializable key 기반 back stack과 엔트리 단위 상태 복원 |
+| Hilt | DI | 모듈 간 repository / network binding을 단순하게 유지 |
+| Retrofit | REST API | Upbit REST 클라이언트 구성이 간결함 |
+| OkHttp WebSocket | 실시간 호가 / 현재가 | `callbackFlow` 래핑에 적합 |
+| kotlinx.serialization | JSON 직렬화 | REST / WS 모델을 일관되게 처리 가능 |
 | Coroutines / Flow | 비동기 처리 | StateFlow, callbackFlow, 테스트 도구와 궁합이 좋음 |
-| JUnit4 + Turbine + MockK | 테스트 | ViewModel/Flow 검증에 적합 |
+| JUnit4 | 단위 테스트 실행 | Android 단위 테스트 기본 구성이 단순함 |
+| MockK | 테스트 더블 | repository / client mocking이 편함 |
+| Turbine | Flow 검증 | 순차 이벤트 검증, collect 타이밍 제어, retry / 재구독 시나리오 검증이 쉬워 ViewModel과 repository 테스트에 적합 |
 
 ## 가정과 판단
 
-- 종목 리스트는 **KRW 마켓만** 표시합니다.
-- 종목 리스트의 현재가와 24h 변동률은 REST `/v1/ticker`를 **5초 polling**으로 갱신합니다.
-- 호가창 중앙의 현재가는 WebSocket `ticker.trade_price`를 사용합니다.
-- 호가 수량은 기본 15단(`KRW-BTC.15`)으로 구독합니다.
-- 호가창은 과제 요구사항에 맞춰 REST polling 없이 WebSocket만 사용합니다.
-- refresh 시 `OrderBook`와 `MarketList` 모두 이전 표시 상태를 버리고 `Loading`부터 다시 시작합니다.
-- Compose Preview는 `src/debug`에만 두어 release 산출물에서 제외합니다.
-- ViewModel 인터페이스는 도입하지 않았습니다. 대신 fake repository와 stateless screen으로 테스트성을 확보했습니다.
+- 종목 리스트는 KRW 마켓만 표시합니다.
+- 리스트의 현재가와 24시간 변동률은 REST `/v1/ticker` polling으로 갱신합니다.
+- 호가창은 REST polling 없이 WebSocket만 사용합니다.
+- 호가 수량은 기본 15단으로 구독합니다.
+- Compose Preview는 `src/debug`에만 둡니다.
+- ViewModel 인터페이스는 두지 않고 fake repository와 stateless screen으로 테스트 seam을 확보합니다.
+- 수치 타입은 `Double`을 유지했습니다. 공개 API가 `Double` 기반이고, 현재 범위에서는 화면 표시 수준의 정밀도만 필요하므로 BigDecimal 계열 도입은 생략했습니다.
 
-## 프로젝트 구조
+## 테스트 전략
 
-```
-app/
-core/
-  model/
-  domain/
-  network/
-  data/
-feature/
-  market/
-  orderbook/
-```
+- `OrderBookRepositoryImplTest`: WebSocket frame 병합과 error payload 전이 검증
+- `NetworkStatusRepositoryImplTest`: connectivity flow 초기값과 전이 검증
+- `MarketListViewModelTest`: 초기 로딩, 온라인 실패, 오프라인 유지, 자동 polling 재개, retry 검증
+- `OrderBookViewModelTest`: orderbook / ticker 누적, 온라인 socket 실패, 오프라인 유지, 자동 재구독, retry 검증
 
 ## 검증 결과
 
@@ -119,10 +217,8 @@ feature/
 
 ## 관련 문서
 
-- [`docs/DEVELOPMENT_PLAN.md`](./docs/DEVELOPMENT_PLAN.md) — 재구성한 개발 기획 문서
-- [`AGENTS.md`](./AGENTS.md) — 이 저장소에서 AI 에이전트 작업 규칙
-## 최근 조정 메모
-
-- `OrderBookViewModel`, `MarketListViewModel`의 refresh trigger는 `MutableStateFlow<Int>` 대신 `MutableSharedFlow<Unit>`를 사용한다. 재시도는 값 비교가 아니라 이벤트 의미가 더 맞고, `StateFlow<Unit>`은 같은 값 재방출이 불가능하기 때문이다.
-- `OrderBookContract.UiState.Error`는 문자열 메시지 대신 `ErrorType(NETWORK, SOCKET)`만 가진다. 실제 안내 문구와 버튼 노출 여부는 화면에서 `strings.xml`과 `type`으로 결정한다.
-- `OrderBook` 진입 시 네트워크가 없으면 WebSocket 구독 전에 `NETWORK` 에러를 표시하고, 소켓 통신 실패일 때만 새로고침 버튼을 노출한다.
+- [`docs/DEVELOPMENT_PLAN.md`](./docs/DEVELOPMENT_PLAN.md)
+- [`ROADMAP.md`](./ROADMAP.md)
+- [`RETROSPECTIVE.md`](./RETROSPECTIVE.md)
+- [`docs/사전과제.md`](./docs/사전과제.md)
+- [`AGENTS.md`](./AGENTS.md)
