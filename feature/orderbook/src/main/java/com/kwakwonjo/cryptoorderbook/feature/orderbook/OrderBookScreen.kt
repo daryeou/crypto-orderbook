@@ -78,8 +78,6 @@ fun OrderBookScreen(
 
             is OrderBookContract.UiState.Error -> {
                 OrderBookErrorState(
-                    errorType = uiState.type,
-                    canRetry = uiState.canRetry,
                     onRetry = onRetry,
                     modifier = contentModifier,
                 )
@@ -113,8 +111,6 @@ private fun OrderBookLoadingState(
 
 @Composable
 private fun OrderBookErrorState(
-    errorType: OrderBookContract.ErrorType,
-    canRetry: Boolean,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -137,23 +133,16 @@ private fun OrderBookErrorState(
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = stringResource(
-                        when (errorType) {
-                            OrderBookContract.ErrorType.NETWORK -> R.string.orderbook_error_message_network
-                            OrderBookContract.ErrorType.SOCKET -> R.string.orderbook_error_message_socket
-                        }
-                    ),
+                    text = stringResource(R.string.orderbook_error_message_socket),
                     modifier = Modifier.padding(top = 8.dp),
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                 )
-                if (canRetry) {
-                    Button(
-                        onClick = onRetry,
-                        modifier = Modifier.padding(top = 16.dp),
-                    ) {
-                        Text(text = stringResource(R.string.orderbook_retry))
-                    }
+                Button(
+                    onClick = onRetry,
+                    modifier = Modifier.padding(top = 16.dp),
+                ) {
+                    Text(text = stringResource(R.string.orderbook_retry))
                 }
             }
         }

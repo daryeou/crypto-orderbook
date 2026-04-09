@@ -9,7 +9,6 @@ sealed interface OrderBookContract {
     )
 
     enum class ErrorType {
-        NETWORK,
         SOCKET,
     }
 
@@ -23,10 +22,7 @@ sealed interface OrderBookContract {
         data class Error(
             override val meta: Meta,
             val type: ErrorType,
-        ) : UiState {
-            val canRetry: Boolean
-                get() = type == ErrorType.SOCKET
-        }
+        ) : UiState
 
         data class Success(
             override val meta: Meta,
