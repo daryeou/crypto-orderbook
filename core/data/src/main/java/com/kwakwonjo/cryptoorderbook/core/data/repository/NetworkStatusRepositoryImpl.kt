@@ -5,7 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import com.kwakwonjo.cryptoorderbook.core.domain.repository.NetworkStatusRepository
-import com.kwakwonjo.cryptoorderbook.core.model.ConnectivityStatus
+import com.kwakwonjo.cryptoorderbook.core.model.NetworkAvailability
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.channels.awaitClose
@@ -18,34 +18,34 @@ class NetworkStatusRepositoryImpl @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) : NetworkStatusRepository {
 
-    override fun observeConnectivity(): Flow<ConnectivityStatus> = callbackFlow {
+    override fun observeConnectivity(): Flow<NetworkAvailability> = callbackFlow {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
             ?: run {
-                trySend(ConnectivityStatus.DISCONNECTED)
+            trySend(NetworkAvailability.DISCONNECTED)
                 close()
                 return@callbackFlow
             }
 
-        trySend(connectivityManager.currentConnectivityStatus())
+        trySend(connectivityManager.currentNetworkAvailability())
 
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                trySend(connectivityManager.currentConnectivityStatus())
+                trySend(connectivityManager.currentNetworkAvailability())
             }
 
             override fun onCapabilitiesChanged(
                 network: Network,
                 networkCapabilities: NetworkCapabilities,
             ) {
-                trySend(networkCapabilities.toConnectivityStatus())
+                trySend(networkCapabilities.toNetworkAvailability())
             }
 
             override fun onLost(network: Network) {
-                trySend(ConnectivityStatus.DISCONNECTED)
+                trySend(NetworkAvailability.DISCONNECTED)
             }
 
             override fun onUnavailable() {
-                trySend(ConnectivityStatus.DISCONNECTED)
+                trySend(NetworkAvailability.DISCONNECTED)
             }
         }
 
@@ -68,20 +68,20 @@ class NetworkStatusRepositoryImpl @Inject constructor(
             capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
-    private fun ConnectivityManager.currentConnectivityStatus(): ConnectivityStatus {
-        val activeNetwork = activeNetwork ?: return ConnectivityStatus.DISCONNECTED
-        val capabilities = getNetworkCapabilities(activeNetwork) ?: return ConnectivityStatus.DISCONNECTED
-        return capabilities.toConnectivityStatus()
+    private fun ConnectivityManager.currentNetworkAvailability(): NetworkAvailability {
+        val activeNetwork = activeNetwork ?: return NetworkAvailability.DISCONNECTED
+        val capabilities = getNetworkCapabilities(activeNetwork) ?: return NetworkAvailability.DISCONNECTED
+        return capabilities.toNetworkAvailability()
     }
 
-    private fun NetworkCapabilities.toConnectivityStatus(): ConnectivityStatus {
+    private fun NetworkCapabilities.toNetworkAvailability(): NetworkAvailability {
         return if (
             hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
             hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
         ) {
-            ConnectivityStatus.CONNECTED
+            NetworkAvailability.CONNECTED
         } else {
-            ConnectivityStatus.DISCONNECTED
+            NetworkAvailability.DISCONNECTED
         }
     }
 }

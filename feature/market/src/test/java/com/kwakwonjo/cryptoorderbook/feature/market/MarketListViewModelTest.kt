@@ -6,7 +6,7 @@ import com.kwakwonjo.cryptoorderbook.core.domain.repository.NetworkStatusReposit
 import com.kwakwonjo.cryptoorderbook.core.domain.usecase.IsNetworkAvailableUseCase
 import com.kwakwonjo.cryptoorderbook.core.domain.usecase.ObserveConnectivityUseCase
 import com.kwakwonjo.cryptoorderbook.core.domain.usecase.ObserveMarketSummariesUseCase
-import com.kwakwonjo.cryptoorderbook.core.model.ConnectivityStatus
+import com.kwakwonjo.cryptoorderbook.core.model.NetworkAvailability
 import com.kwakwonjo.cryptoorderbook.core.model.MarketSummary
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -37,7 +37,7 @@ class MarketListViewModelTest {
                 upstream
             },
         )
-        val networkStatusRepository = FakeNetworkStatusRepository(ConnectivityStatus.CONNECTED)
+        val networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.CONNECTED)
         val viewModel = createViewModel(
             repository = repository,
             networkStatusRepository = networkStatusRepository,
@@ -78,7 +78,7 @@ class MarketListViewModelTest {
                 error("Polling should not start while offline.")
             },
         )
-        val networkStatusRepository = FakeNetworkStatusRepository(ConnectivityStatus.DISCONNECTED)
+        val networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.DISCONNECTED)
         val viewModel = createViewModel(
             repository = repository,
             networkStatusRepository = networkStatusRepository,
@@ -99,7 +99,7 @@ class MarketListViewModelTest {
     fun `online polling failure exposes error state`() = runTest {
         // given
         val failGate = CompletableDeferred<Unit>()
-        val networkStatusRepository = FakeNetworkStatusRepository(ConnectivityStatus.CONNECTED)
+        val networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.CONNECTED)
         val viewModel = createViewModel(
             repository = FakeMarketRepository(
                 flowFactory = {
@@ -144,7 +144,7 @@ class MarketListViewModelTest {
                 }
             },
         )
-        val networkStatusRepository = FakeNetworkStatusRepository(ConnectivityStatus.CONNECTED)
+        val networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.CONNECTED)
         val viewModel = createViewModel(
             repository = repository,
             networkStatusRepository = networkStatusRepository,
@@ -219,7 +219,7 @@ class MarketListViewModelTest {
                 }
             },
         )
-        val networkStatusRepository = FakeNetworkStatusRepository(ConnectivityStatus.CONNECTED)
+        val networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.CONNECTED)
         val viewModel = createViewModel(
             repository = repository,
             networkStatusRepository = networkStatusRepository,
@@ -232,13 +232,13 @@ class MarketListViewModelTest {
             firstUpstream.emit(firstMarkets)
             assertEquals(MarketListContract.UiState.Success(firstMarkets), awaitItem())
 
-            networkStatusRepository.setStatus(ConnectivityStatus.DISCONNECTED)
+            networkStatusRepository.setStatus(NetworkAvailability.DISCONNECTED)
             advanceUntilIdle()
 
             assertEquals(1, cancellationCount)
             expectNoEvents()
 
-            networkStatusRepository.setStatus(ConnectivityStatus.CONNECTED)
+            networkStatusRepository.setStatus(NetworkAvailability.CONNECTED)
             advanceUntilIdle()
 
             assertEquals(2, repository.observeCalls)
@@ -273,15 +273,15 @@ class MarketListViewModelTest {
     }
 
     private class FakeNetworkStatusRepository(
-        initialStatus: ConnectivityStatus,
+        initialStatus: NetworkAvailability,
     ) : NetworkStatusRepository {
         private val connectivity = MutableStateFlow(initialStatus)
 
-        override fun observeConnectivity(): Flow<ConnectivityStatus> = connectivity
+        override fun observeConnectivity(): Flow<NetworkAvailability> = connectivity
 
-        override fun isNetworkAvailable(): Boolean = connectivity.value == ConnectivityStatus.CONNECTED
+        override fun isNetworkAvailable(): Boolean = connectivity.value == NetworkAvailability.CONNECTED
 
-        fun setStatus(status: ConnectivityStatus) {
+        fun setStatus(status: NetworkAvailability) {
             connectivity.value = status
         }
     }

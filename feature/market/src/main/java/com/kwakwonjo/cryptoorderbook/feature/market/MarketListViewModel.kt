@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.kwakwonjo.cryptoorderbook.core.domain.usecase.IsNetworkAvailableUseCase
 import com.kwakwonjo.cryptoorderbook.core.domain.usecase.ObserveConnectivityUseCase
 import com.kwakwonjo.cryptoorderbook.core.domain.usecase.ObserveMarketSummariesUseCase
-import com.kwakwonjo.cryptoorderbook.core.model.ConnectivityStatus
+import com.kwakwonjo.cryptoorderbook.core.model.NetworkAvailability
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,20 +40,20 @@ class MarketListViewModel @Inject constructor(
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
 
-    private val connectivityStatus: StateFlow<ConnectivityStatus> = observeConnectivityUseCase()
+    private val networkAvailability: StateFlow<NetworkAvailability> = observeConnectivityUseCase()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
             initialValue = if (isNetworkAvailableUseCase()) {
-                ConnectivityStatus.CONNECTED
+                NetworkAvailability.CONNECTED
             } else {
-                ConnectivityStatus.DISCONNECTED
+                NetworkAvailability.DISCONNECTED
             },
         )
 
-    val uiState: StateFlow<MarketListContract.UiState> = connectivityStatus
+    val uiState: StateFlow<MarketListContract.UiState> = networkAvailability
         .flatMapLatest { status ->
-            if (status == ConnectivityStatus.DISCONNECTED) {
+            if (status == NetworkAvailability.DISCONNECTED) {
                 emptyFlow()
             } else {
                 refreshTrigger
@@ -91,7 +91,7 @@ class MarketListViewModel @Inject constructor(
                     state
                 }
                 .catch {
-                    if (connectivityStatus.value == ConnectivityStatus.CONNECTED) {
+                    if (networkAvailability.value == NetworkAvailability.CONNECTED) {
                         emit(MarketListContract.UiState.Error)
                     }
                 }

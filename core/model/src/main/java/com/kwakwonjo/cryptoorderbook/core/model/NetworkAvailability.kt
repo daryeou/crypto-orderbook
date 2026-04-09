@@ -1,6 +1,6 @@
 package com.kwakwonjo.cryptoorderbook.core.model
 
-enum class ConnectivityStatus {
+enum class NetworkAvailability {
     CONNECTED,
     DISCONNECTED,
 }

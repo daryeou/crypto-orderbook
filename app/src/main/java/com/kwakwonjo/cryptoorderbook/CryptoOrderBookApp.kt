@@ -29,7 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.kwakwonjo.cryptoorderbook.core.model.ConnectivityStatus
+import com.kwakwonjo.cryptoorderbook.core.model.NetworkAvailability
 import com.kwakwonjo.cryptoorderbook.navigation.CryptoOrderBookNavHost
 
 @Composable
@@ -38,17 +38,17 @@ fun CryptoOrderBookApp(
     modifier: Modifier = Modifier,
     viewModel: AppRootViewModel = hiltViewModel(),
 ) {
-    val connectivityStatus by viewModel.connectivityStatus.collectAsStateWithLifecycle()
+    val networkAvailability by viewModel.networkAvailability.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val interactionSource = remember { MutableInteractionSource() }
     val offlineSnackbarMessage = stringResource(R.string.global_offline_snackbar)
     val offlineOverlayMessage = stringResource(R.string.global_offline_overlay_message)
-    var previousStatus by remember { mutableStateOf(connectivityStatus) }
+    var previousStatus by remember { mutableStateOf(networkAvailability) }
 
-    LaunchedEffect(connectivityStatus, offlineSnackbarMessage) {
+    LaunchedEffect(networkAvailability, offlineSnackbarMessage) {
         if (
-            previousStatus == ConnectivityStatus.CONNECTED &&
-            connectivityStatus == ConnectivityStatus.DISCONNECTED
+            previousStatus == NetworkAvailability.CONNECTED &&
+            networkAvailability == NetworkAvailability.DISCONNECTED
         ) {
             snackbarHostState.showSnackbar(
                 message = offlineSnackbarMessage,
@@ -56,11 +56,11 @@ fun CryptoOrderBookApp(
             )
         }
 
-        if (connectivityStatus == ConnectivityStatus.CONNECTED) {
+        if (networkAvailability == NetworkAvailability.CONNECTED) {
             snackbarHostState.currentSnackbarData?.dismiss()
         }
 
-        previousStatus = connectivityStatus
+        previousStatus = networkAvailability
     }
 
     Scaffold(
@@ -79,7 +79,7 @@ fun CryptoOrderBookApp(
                 onFinishRequest = onFinishRequest,
             )
 
-            if (connectivityStatus == ConnectivityStatus.DISCONNECTED) {
+            if (networkAvailability == NetworkAvailability.DISCONNECTED) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

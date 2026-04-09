@@ -5,7 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import app.cash.turbine.test
-import com.kwakwonjo.cryptoorderbook.core.model.ConnectivityStatus
+import com.kwakwonjo.cryptoorderbook.core.model.NetworkAvailability
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -39,7 +39,7 @@ class NetworkStatusRepositoryImplTest {
 
         repository.observeConnectivity().test {
             // when
-            assertEquals(ConnectivityStatus.CONNECTED, awaitItem())
+            assertEquals(NetworkAvailability.CONNECTED, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
 
@@ -68,13 +68,13 @@ class NetworkStatusRepositoryImplTest {
 
         repository.observeConnectivity().test {
             // when
-            assertEquals(ConnectivityStatus.DISCONNECTED, awaitItem())
+            assertEquals(NetworkAvailability.DISCONNECTED, awaitItem())
 
             callbackSlot.captured.onCapabilitiesChanged(network, connectedCapabilities)
-            assertEquals(ConnectivityStatus.CONNECTED, awaitItem())
+            assertEquals(NetworkAvailability.CONNECTED, awaitItem())
 
             callbackSlot.captured.onCapabilitiesChanged(network, disconnectedCapabilities)
-            assertEquals(ConnectivityStatus.DISCONNECTED, awaitItem())
+            assertEquals(NetworkAvailability.DISCONNECTED, awaitItem())
 
             callbackSlot.captured.onLost(network)
 
