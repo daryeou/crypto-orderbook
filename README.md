@@ -75,11 +75,16 @@ app
 
 ### 상태 관리
 
-- 각 화면은 `*Contract.UiState` sealed interface를 사용합니다.
+- `MarketList`는 `Loading / Error / Success` 형태의 `MarketListContract.UiState`를 사용합니다.
+- `OrderBook`는 `meta + content + uiStatus` 구조의 `OrderBookContract.UiState`를 사용합니다.
+  - `meta`: 종목 정보
+  - `content`: 현재 렌더링 가능한 호가/현재가/등락률
+  - `uiStatus`: `IDLE`, `INITIAL_LOADING`, `SOCKET_ERROR`, `OFFLINE`
 - `Route`와 `Screen`을 분리합니다.
   - `Route`: Hilt 주입, 상태 수집, 액션 전달
   - `Screen`: 순수 UI 렌더링
 - `MarketListViewModel`과 `OrderBookViewModel`은 `SharedFlow<Unit> + flatMapLatest + stateIn(WhileSubscribed)` 패턴으로 새로고침과 수집 생명주기를 관리합니다.
+- `OrderBookViewModel`은 repository가 누적해 전달한 `OrderBookPayload`와 `NetworkAvailability`를 결합해 최종 `UiState`를 만듭니다.
 
 ### Navigation
 
@@ -163,7 +168,7 @@ flowchart LR
 ## 오프라인 처리 정책
 
 - 오프라인은 화면 에러가 아니라 앱 전역 상태로 다룹니다.
-- `NetworkStatusRepository.observeConnectivity()`가 `ConnectivityStatus`를 제공합니다.
+- `NetworkStatusRepository.observeConnectivity()`가 `NetworkAvailability`를 제공합니다.
 - 연결 여부는 `activeNetwork` 존재만으로 판단하지 않고, `NetworkCapabilities`의 `NET_CAPABILITY_INTERNET`와 `NET_CAPABILITY_VALIDATED`를 함께 확인합니다.
   - `NET_CAPABILITY_INTERNET`: 인터넷용 네트워크인지
   - `NET_CAPABILITY_VALIDATED`: 실제 외부 인터넷 연결이 검증됐는지
@@ -208,7 +213,7 @@ flowchart LR
 - `OrderBookRepositoryImplTest`: WebSocket frame 병합과 error payload 전이 검증
 - `NetworkStatusRepositoryImplTest`: connectivity flow 초기값과 전이 검증
 - `MarketListViewModelTest`: 초기 로딩, 온라인 실패, 오프라인 유지, 자동 polling 재개, retry 검증
-- `OrderBookViewModelTest`: orderbook / ticker 누적, 온라인 socket 실패, 오프라인 유지, 자동 재구독, retry 검증
+- `OrderBookViewModelTest`: 누적 payload 기반 `UiState(meta + content + uiStatus)`, 온라인 socket 실패, 오프라인 유지, retry 검증
 
 ## 검증 결과
 
@@ -222,3 +227,8 @@ flowchart LR
 - [`RETROSPECTIVE.md`](./RETROSPECTIVE.md)
 - [`docs/사전과제.md`](./docs/사전과제.md)
 - [`AGENTS.md`](./AGENTS.md)
+
+## 다음 작업
+
+- `MarketListViewModel` 상태 구조를 현재 `OrderBookViewModel` 정리 방향과 비교해 단순화 여부를 점검합니다.
+- 그 다음 종목 리스트와 호가창의 전체 UI, 세부 기능, 표현 방식을 정리합니다.

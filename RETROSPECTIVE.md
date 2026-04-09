@@ -106,7 +106,7 @@
 - **AI 출력**: 오프라인은 앱 전역 상태로 분리하고, 화면 에러는 온라인 상태의 REST / WebSocket 실패로 한정하는 방향 제안
 - **판단**: 수락
 - **이유**: 네트워크 단절을 각 화면 에러로 처리하면 UX가 중복되고 마지막 성공 상태 유지가 어려웠다
-- **수정 내용**: `ConnectivityStatus`, `observeConnectivity()`, `CryptoOrderBookApp`를 도입하고 루트 오버레이와 화면별 온라인 실패 처리를 분리했다
+- **수정 내용**: `NetworkAvailability`, `observeConnectivity()`, `CryptoOrderBookApp`를 도입하고 루트 오버레이와 화면별 온라인 실패 처리를 분리했다
 - **검증**: `NetworkStatusRepositoryImplTest`, 각 ViewModel 테스트, `testDebugUnitTest`, `assembleDebug`로 확인했다
 
 ### 사례 8: 정밀도 타입 검토 후 Double 유지
@@ -135,6 +135,15 @@
 - **이유**: `activeNetwork`만 있으면 와이파이에 붙어 있지만 실제 인터넷이 안 되는 상태를 걸러내지 못한다
 - **수정 내용**: `activeNetwork`로 현재 네트워크를 찾은 뒤 `NetworkCapabilities`의 `NET_CAPABILITY_INTERNET`과 `NET_CAPABILITY_VALIDATED`를 함께 확인하도록 정리했다
 - **검증**: `NetworkStatusRepositoryImplTest`에서 초기 상태와 capability 전이를 검증했고, 실제 구현도 같은 기준으로 통일했다
+
+### 사례 11: OrderBookViewModel 상태 구조 단순화
+- **맥락**: `OrderBookViewModel`의 `uiState` 조립 로직이 누적 상태와 네트워크 상태를 함께 다루면서 읽기 어려워지던 단계
+- **프롬프트**: `meta + content + uiStatus` 구조로 정리하고, `uiState`는 `orderBookFlow`와 `NetworkAvailability`만 결합하는 단순한 형태로 만들고 싶다는 요청
+- **AI 출력**: 중간 `socketAwareUiState`나 `scan` 기반 누적 상태를 `uiState` 쪽에 두는 방향도 제안했다
+- **판단**: 수정
+- **이유**: 최종 `uiState` 조립부는 단순해야 하고, 이전 값 유지가 필요하더라도 그 책임은 raw payload 흐름 한 곳에만 두는 편이 읽기 쉬웠다
+- **수정 내용**: `OrderBookPayload` 누적은 `orderBookFlow.scan { previous.merge(payload) }`로 한정하고, `uiState`는 `combine(orderBookFlow, networkAvailability)`에서 `meta + content + uiStatus`만 조립하도록 정리했다
+- **검증**: `OrderBookContract`, `OrderBookViewModel`, `OrderBookScreen`, preview, 테스트가 같은 상태 구조를 보도록 맞췄고, 이후 `MarketListViewModel`도 같은 관점에서 단순화할 후보로 남겼다
 
 ---
 

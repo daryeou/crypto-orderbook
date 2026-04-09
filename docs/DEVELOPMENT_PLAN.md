@@ -115,13 +115,17 @@ feature:orderbook
 
 1. `NetworkStatusRepository`가 `observeConnectivity()`와 `isNetworkAvailable()`를 제공한다.
    - 단순히 `activeNetwork` 존재 여부만 보지 않고, `NetworkCapabilities`의 `NET_CAPABILITY_INTERNET`와 `NET_CAPABILITY_VALIDATED`를 함께 확인해 실제 인터넷 가능 상태만 온라인으로 판단한다.
-2. `AppRootViewModel`이 연결 상태를 `StateFlow<ConnectivityStatus>`로 노출한다.
+2. `AppRootViewModel`이 연결 상태를 `StateFlow<NetworkAvailability>`로 노출한다.
 3. `CryptoOrderBookApp`이 루트 `SnackbarHost`와 오프라인 오버레이를 제어한다.
 4. 각 화면 ViewModel은 같은 connectivity 흐름을 기준으로 온라인 상태에서만 갱신을 유지한다.
 
 ## 상태 관리 전략
 
-- 종목 리스트와 호가창 모두 `*Contract.UiState` sealed interface를 사용한다.
+- `MarketList`는 `Loading / Error / Success` 형태의 `MarketListContract.UiState`를 사용한다.
+- `OrderBook`는 `meta + content + uiStatus` 구조의 `OrderBookContract.UiState`를 사용한다.
+  - `meta`: 종목 정보
+  - `content`: 현재 화면에 그릴 수 있는 호가/현재가/등락률
+  - `uiStatus`: `IDLE`, `INITIAL_LOADING`, `SOCKET_ERROR`, `OFFLINE`
 - ViewModel은 `StateFlow` 하나만 외부로 노출한다.
 - 새로고침은 상태값이 아니라 이벤트이므로 `MutableSharedFlow<Unit>`로 처리한다.
 - `flatMapLatest + stateIn(WhileSubscribed)`로 화면 구독 상태에 맞춰 upstream 수집을 제어한다.
@@ -141,10 +145,10 @@ feature:orderbook
   - 온라인 상태에서 REST polling 실패 시에만 `Error`를 낸다.
   - 연결 복구 시 자동으로 polling을 재개한다.
 - `OrderBookViewModel`
-  - 오프라인 시 `Error`를 내지 않는다.
-  - 마지막 `Success` 또는 `Loading`을 유지한다.
-  - 온라인 상태에서 WebSocket 실패 시에만 `Error(SOCKET)`을 낸다.
-  - 연결 복구 시 자동으로 재구독한다.
+  - 오프라인 시 `uiStatus = OFFLINE`으로만 전환하고 마지막 `content`는 유지한다.
+  - 온라인 상태에서 WebSocket 실패 시에만 `uiStatus = SOCKET_ERROR`를 낸다.
+  - repository가 누적한 payload와 `NetworkAvailability`를 결합해 `UiState`를 만든다.
+  - 연결 복구 후 재구독은 `Route`에서 전이를 감지해 `refresh()`를 호출하는 방식으로 처리한다.
 - 수동 `retry()`는 온라인 상태의 실패 화면에서만 사용한다.
 
 ## 테스트 전략
@@ -197,8 +201,10 @@ feature:orderbook
 
 ## 남은 이슈와 후속 과제
 
+- `MarketListViewModel` 상태 구조를 현재 `OrderBookViewModel` 정리 방향과 비교해 단순화 여부를 점검
 - WebSocket 자동 재연결 백오프 정책
 - `MarketList` 빈 상태 전용 UI
 - stale 데이터 유지 정책 고도화
 - 오프라인 복구 후 사용자 안내 방식 세분화
 - 정렬/필터와 사용자 편의 기능 확장
+- 종목 리스트와 호가창의 전체 UI, 세부 표현, 가독성 개선

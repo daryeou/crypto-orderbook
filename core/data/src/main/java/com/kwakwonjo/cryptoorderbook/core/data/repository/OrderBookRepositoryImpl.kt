@@ -31,7 +31,7 @@ class OrderBookRepositoryImpl @Inject constructor(
             emit(
                 OrderBookPayload(
                     connectionState = ConnectionState.Error,
-                    errorMessage = throwable.message ?: DEFAULT_ERROR_MESSAGE,
+                    errorMessage = throwable.message,
                 )
             )
         }
@@ -67,10 +67,6 @@ class OrderBookRepositoryImpl @Inject constructor(
                 errorMessage = null,
             )
         }
-    }
-
-    private companion object {
-        const val DEFAULT_ERROR_MESSAGE = "WebSocket 연결에 실패했습니다."
     }
 }
 

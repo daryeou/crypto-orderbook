@@ -64,29 +64,29 @@ fun OrderBookScreen(
             )
         }
     ) { innerPadding ->
-        val contentModifier = Modifier
-            .fillMaxSize()
-            .padding(innerPadding)
-            .padding(horizontal = 16.dp)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(horizontal = 16.dp),
+        ) {
+            OrderBookContent(
+                uiState = uiState,
+                modifier = Modifier.fillMaxSize(),
+            )
 
-        when (uiState) {
-            is OrderBookContract.UiState.Loading -> {
-                OrderBookLoadingState(
-                    modifier = contentModifier,
+            if (uiState.uiStatus == OrderBookContract.UiStatus.INITIAL_LOADING) {
+                OrderBookLoadingOverlay(
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
 
-            is OrderBookContract.UiState.Error -> {
-                OrderBookErrorState(
+            if (uiState.uiStatus == OrderBookContract.UiStatus.SOCKET_ERROR) {
+                OrderBookRetryOverlay(
                     onRetry = onRetry,
-                    modifier = contentModifier,
-                )
-            }
-
-            is OrderBookContract.UiState.Success -> {
-                OrderBookContent(
-                    uiState = uiState,
-                    modifier = contentModifier,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 24.dp),
                 )
             }
         }
@@ -94,7 +94,7 @@ fun OrderBookScreen(
 }
 
 @Composable
-private fun OrderBookLoadingState(
+private fun OrderBookLoadingOverlay(
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -110,40 +110,33 @@ private fun OrderBookLoadingState(
 }
 
 @Composable
-private fun OrderBookErrorState(
+private fun OrderBookRetryOverlay(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(
-        modifier = modifier,
-        contentAlignment = Alignment.Center,
-    ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
+    Card(modifier = modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+            Text(
+                text = stringResource(R.string.orderbook_error_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = stringResource(R.string.orderbook_error_message_socket),
+                modifier = Modifier.padding(top = 8.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+            )
+            Button(
+                onClick = onRetry,
+                modifier = Modifier.padding(top = 16.dp),
             ) {
-                Text(
-                    text = stringResource(R.string.orderbook_error_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = stringResource(R.string.orderbook_error_message_socket),
-                    modifier = Modifier.padding(top = 8.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                )
-                Button(
-                    onClick = onRetry,
-                    modifier = Modifier.padding(top = 16.dp),
-                ) {
-                    Text(text = stringResource(R.string.orderbook_retry))
-                }
+                Text(text = stringResource(R.string.orderbook_retry))
             }
         }
     }
@@ -151,23 +144,23 @@ private fun OrderBookErrorState(
 
 @Composable
 private fun OrderBookContent(
-    uiState: OrderBookContract.UiState.Success,
+    uiState: OrderBookContract.UiState,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()),
     ) {
-        AskSection(orderBook = uiState.orderBook)
+        AskSection(orderBook = uiState.content?.orderBook)
         CurrentPriceCard(
-            currentPrice = uiState.currentPrice,
-            signedChangeRate = uiState.signedChangeRate,
+            currentPrice = uiState.content?.currentPrice,
+            signedChangeRate = uiState.content?.signedChangeRate,
         )
-        BidSection(orderBook = uiState.orderBook)
+        BidSection(orderBook = uiState.content?.orderBook)
     }
 }
 
 @Composable
-private fun AskSection(orderBook: OrderBook) {
+private fun AskSection(orderBook: OrderBook?) {
     Text(
         text = stringResource(R.string.orderbook_ask_section),
         modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
@@ -175,15 +168,23 @@ private fun AskSection(orderBook: OrderBook) {
         fontWeight = FontWeight.SemiBold,
     )
 
-    val maxAskSize = orderBook.asks.maxOfOrNull { it.size } ?: 1.0
-    orderBook.asks.reversed().forEach { unit ->
-        OrderBookRow(
-            unit = unit,
-            maxSize = maxAskSize,
-            label = "ASK",
-            priceColor = Color(0xFFD32F2F),
-            backgroundColor = Color(0xFFFFEBEE),
-        )
+    val asks = orderBook?.asks.orEmpty()
+    val maxAskSize = asks.maxOfOrNull { it.size } ?: 1.0
+
+    if (asks.isEmpty()) {
+        repeat(3) {
+            PlaceholderOrderBookRow()
+        }
+    } else {
+        asks.reversed().forEach { unit ->
+            OrderBookRow(
+                unit = unit,
+                maxSize = maxAskSize,
+                label = "ASK",
+                priceColor = Color(0xFFD32F2F),
+                backgroundColor = Color(0xFFFFEBEE),
+            )
+        }
     }
 }
 
@@ -219,9 +220,9 @@ private fun CurrentPriceCard(
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
             )
-            signedChangeRate?.let {
+            if (signedChangeRate != null) {
                 Text(
-                    text = String.format(Locale.KOREA, "%+.2f%%", it * 100),
+                    text = String.format(Locale.KOREA, "%+.2f%%", signedChangeRate * 100),
                     modifier = Modifier.padding(top = 4.dp),
                     color = changeColor,
                     style = MaterialTheme.typography.bodyLarge,
@@ -232,7 +233,7 @@ private fun CurrentPriceCard(
 }
 
 @Composable
-private fun BidSection(orderBook: OrderBook) {
+private fun BidSection(orderBook: OrderBook?) {
     Text(
         text = stringResource(R.string.orderbook_bid_section),
         modifier = Modifier.padding(bottom = 8.dp),
@@ -240,15 +241,52 @@ private fun BidSection(orderBook: OrderBook) {
         fontWeight = FontWeight.SemiBold,
     )
 
-    val maxBidSize = orderBook.bids.maxOfOrNull { it.size } ?: 1.0
-    orderBook.bids.forEach { unit ->
-        OrderBookRow(
-            unit = unit,
-            maxSize = maxBidSize,
-            label = "BID",
-            priceColor = Color(0xFF1976D2),
-            backgroundColor = Color(0xFFE3F2FD),
-        )
+    val bids = orderBook?.bids.orEmpty()
+    val maxBidSize = bids.maxOfOrNull { it.size } ?: 1.0
+
+    if (bids.isEmpty()) {
+        repeat(3) {
+            PlaceholderOrderBookRow()
+        }
+    } else {
+        bids.forEach { unit ->
+            OrderBookRow(
+                unit = unit,
+                maxSize = maxBidSize,
+                label = "BID",
+                priceColor = Color(0xFF1976D2),
+                backgroundColor = Color(0xFFE3F2FD),
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlaceholderOrderBookRow() {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp),
+        color = Color.Transparent,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "--",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "--",
+                textAlign = TextAlign.End,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
     }
 }
 
