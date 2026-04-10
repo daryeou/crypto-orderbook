@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">Crypto Order Book</string>
+    <string name="app_name">코인엑스</string>
     <string name="global_offline_snackbar">네트워크 연결이 끊어졌습니다.</string>
 </resources>
