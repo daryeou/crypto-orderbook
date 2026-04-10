@@ -145,6 +145,33 @@
 - **수정 내용**: `OrderBookPayload` 누적은 `orderBookFlow.scan { previous.merge(payload) }`로 한정하고, `uiState`는 `combine(orderBookFlow, networkAvailability)`에서 `meta + content + uiStatus`만 조립하도록 정리했다
 - **검증**: `OrderBookContract`, `OrderBookViewModel`, `OrderBookScreen`, preview, 테스트가 같은 상태 구조를 보도록 맞췄고, 이후 `MarketListViewModel`도 같은 관점에서 단순화할 후보로 남겼다
 
+### 사례 12: MarketList polling 책임과 다중 마켓 탭 구조 정리
+- **맥락**: `MarketListViewModel`을 손보면서 KRW 전용 리스트를 KRW/BTC/USDT 탭 구조로 확장하던 단계
+- **프롬프트**: polling 책임을 repository보다 use case에 두고, `MarketSummary`에 마켓 정보를 넣어 `TabRow` 기반 전환이 가능하도록 정리하고 싶다는 요청
+- **AI 출력**: `MarketRepository`는 단건 fetch만 맡기고, `ObserveMarketSummariesUseCase`에서 `while + delay` polling을 수행하는 방향을 제안했고, 초기에는 `selectedMarketType` 상태를 ViewModel에서 관리하는 구조도 함께 제안했다
+- **판단**: 수정 후 수락
+- **이유**: polling 주기는 데이터 소스 구현보다 도메인 정책에 가까웠고, repository를 다른 곳에서 재사용할 때도 단건 fetch 계약이 더 단순했다. 또한 탭 전환은 ViewModel 상태로 관리하는 편이 Compose 계층보다 테스트하기 쉬웠다
+- **수정 내용**: `MarketRepository`를 `fetchMarketSummaries()` 계약으로 단순화하고, `ObserveMarketSummariesUseCase`가 polling을 담당하도록 변경했다. `MarketSummary`에는 `MarketType`을 추가하고, `MarketListViewModel`은 전체 `items + uiStatus` 상태만 노출하며 `MarketListScreen`이 `TabRow + HorizontalPager`로 시장 전환을 관리하도록 정리했다
+- **검증**: `MarketListViewModelTest`에 retry, 오프라인 복구, 전체 마켓 유지 시나리오를 반영했고 `testDebugUnitTest`, `assembleDebug`를 다시 통과시켰다
+
+### 사례 13: BTC/USDT 소수점 가격 포맷 대응
+- **맥락**: 다중 마켓 지원 후 BTC 마켓 가격이 목록과 호가창에서 충분한 소수 자릿수로 보이지 않던 단계
+- **프롬프트**: BTC 마켓의 경우 가격이 소수점 9자리까지 내려갈 수 있으니 목록과 호가창 모두 대응이 필요하다는 요청
+- **AI 출력**: KRW는 정수 그룹 포맷을 유지하고, BTC/USDT는 별도 소수 포맷으로 분기하는 방향을 정리
+- **판단**: 수락
+- **이유**: KRW 기준 포맷을 그대로 쓰면 BTC/USDT 가격 정보가 과도하게 절삭돼 실제 시세 판단에 필요한 자릿수가 사라진다
+- **수정 내용**: `MarketListScreen`과 `OrderBookScreen`에서 market type 기준으로 가격 포맷을 분기하고, BTC/USDT는 최대 소수점 9자리까지 표시하도록 조정했다
+- **검증**: `testDebugUnitTest`, `assembleDebug`를 다시 실행해 멀티 마켓 확장 이후에도 빌드와 테스트가 유지되는지 확인했다
+
+### 사례 14: 4월 10일 아침, MarketList 구조 리팩터링 시작
+- **맥락**: 다중 마켓 지원 이후 `MarketList` 구조를 다시 점검하던 단계
+- **프롬프트**: 종목 리스트 화면 구조를 보고 불필요하게 ViewModel에서 `BaseState`와 `UiState`가 나뉘어 있고, repository 안에서 `fetchMarketSummaries()`로 모든 티커를 조회하고 있음을 확인했으니 분리 개선 작업을 진행하겠다는 판단 정리
+- **AI 출력**: polling 책임을 use case로 올리고, 탭 상태는 ViewModel보다 화면 계층에서 관리하는 쪽이 단순하다는 방향을 제안
+- **판단**: 수정 후 수락
+- **이유**: 기존 구조는 기능은 동작했지만 상태 계층이 중복되고, 화면 전환 상태까지 ViewModel이 들고 있어 읽기 어려웠다. `MarketList`는 전체 목록과 화면 전환 상태를 분리하는 편이 이후 정렬/필터링 확장에도 유리하다고 봤다
+- **수정 내용**: `MarketRepository`는 단건 fetch만 담당하고 `ObserveMarketSummariesUseCase`가 polling을 관리하도록 유지했다. 이후 `MarketListViewModel`은 전체 목록 상태만 노출하고, `MarketListScreen`이 `TabRow + HorizontalPager`로 시장 전환을 맡도록 구조를 단순화하는 작업을 진행했다
+- **검증**: 리팩터링 중간마다 `MarketListViewModelTest`, `assembleDebug`를 다시 확인하면서 상태 단순화 이후에도 빌드와 테스트가 유지되는지 점검했다
+
 ---
 
 ## AI가 만든 실수

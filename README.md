@@ -1,6 +1,6 @@
 # Crypto Order Book (Android)
 
-Upbit 공개 API를 사용해 KRW 마켓 종목 리스트와 실시간 호가창을 제공하는 Android 앱입니다.
+Upbit 공개 API를 사용해 KRW/BTC/USDT 마켓 종목 리스트와 실시간 호가창을 제공하는 Android 앱입니다.
 
 ## 빌드 & 실행
 
@@ -75,7 +75,7 @@ app
 
 ### 상태 관리
 
-- `MarketList`는 `Loading / Error / Success` 형태의 `MarketListContract.UiState`를 사용합니다.
+- `MarketList`는 `items + uiStatus` 형태의 `MarketListContract.UiState`를 사용하고, 탭 상태는 `TabRow + HorizontalPager`를 사용하는 화면 계층에서 관리합니다.
 - `OrderBook`는 `meta + content + uiStatus` 구조의 `OrderBookContract.UiState`를 사용합니다.
   - `meta`: 종목 정보
   - `content`: 현재 렌더링 가능한 호가/현재가/등락률
@@ -84,6 +84,7 @@ app
   - `Route`: Hilt 주입, 상태 수집, 액션 전달
   - `Screen`: 순수 UI 렌더링
 - `MarketListViewModel`과 `OrderBookViewModel`은 `SharedFlow<Unit> + flatMapLatest + stateIn(WhileSubscribed)` 패턴으로 새로고침과 수집 생명주기를 관리합니다.
+- `ObserveMarketSummariesUseCase`가 polling 주기를 관리하고, `MarketRepository`는 단건 fetch만 담당합니다.
 - `OrderBookViewModel`은 repository가 누적해 전달한 `OrderBookPayload`와 `NetworkAvailability`를 결합해 최종 `UiState`를 만듭니다.
 
 ### Navigation
@@ -109,7 +110,7 @@ app
 ### 3. 종목 리스트 연결
 - 작업: `market/all` + `ticker` 기반 종목 리스트 화면 구현
 - 목적: Must-have 1 우선 달성
-- 검증: KRW 마켓 목록, 현재가, 24시간 변동률 표시 확인
+- 검증: KRW 리스트 표시를 먼저 확인한 뒤, KRW/BTC/USDT 탭 전환과 현재가/24시간 변동률 표시를 확장 확인
 
 ### 4. 호가창 최소 동작 구현
 - 작업: WebSocket `orderbook` + `ticker` 병합, 현재가 포함 호가창 구현
@@ -200,7 +201,8 @@ flowchart LR
 
 ## 가정과 판단
 
-- 종목 리스트는 KRW 마켓만 표시합니다.
+- 종목 리스트는 KRW/BTC/USDT 마켓을 지원하고, 상단 `TabRow`와 `HorizontalPager`로 전환합니다.
+- KRW 가격은 정수 단위 그룹 포맷으로, BTC/USDT 가격은 최대 소수점 9자리까지 표시합니다.
 - 리스트의 현재가와 24시간 변동률은 REST `/v1/ticker` polling으로 갱신합니다.
 - 호가창은 REST polling 없이 WebSocket만 사용합니다.
 - 호가 수량은 기본 15단으로 구독합니다.
@@ -212,7 +214,7 @@ flowchart LR
 
 - `OrderBookRepositoryImplTest`: WebSocket frame 병합과 error payload 전이 검증
 - `NetworkStatusRepositoryImplTest`: connectivity flow 초기값과 전이 검증
-- `MarketListViewModelTest`: 초기 로딩, 온라인 실패, 오프라인 유지, 자동 polling 재개, retry 검증
+- `MarketListViewModelTest`: 초기 로딩, 온라인 실패, 오프라인 유지, 자동 polling 재개, retry, 전체 마켓 유지 검증
 - `OrderBookViewModelTest`: 누적 payload 기반 `UiState(meta + content + uiStatus)`, 온라인 socket 실패, 오프라인 유지, retry 검증
 
 ## 검증 결과
@@ -230,5 +232,5 @@ flowchart LR
 
 ## 다음 작업
 
-- `MarketListViewModel` 상태 구조를 현재 `OrderBookViewModel` 정리 방향과 비교해 단순화 여부를 점검합니다.
+- `MarketList`의 `TabRow + HorizontalPager` 구조를 바탕으로 정렬/필터링과 세부 상태 표현을 다듬습니다.
 - 그 다음 종목 리스트와 호가창의 전체 UI, 세부 기능, 표현 방식을 정리합니다.

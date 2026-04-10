@@ -21,8 +21,9 @@
 
 ### 범위
 
-- Upbit KRW 마켓 종목 리스트
+- Upbit KRW/BTC/USDT 마켓 종목 리스트
 - 종목별 현재가와 24시간 변동률
+- KRW는 정수 가격, BTC/USDT는 최대 소수점 9자리 가격 표시
 - 종목 선택 후 실시간 호가창 진입
 - 현재가, 매도 호가, 매수 호가 표시
 - 로딩/에러/오프라인 상태 처리
@@ -55,7 +56,7 @@
 
 ## 화면 구성과 사용자 흐름
 
-1. 앱 실행 시 KRW 마켓 리스트를 표시한다.
+1. 앱 실행 시 KRW/BTC/USDT 마켓 리스트를 표시하고 탭으로 전환할 수 있다.
 2. 리스트에서 종목명, 현재가, 24시간 변동률을 보여준다.
 3. 사용자가 종목을 선택하면 해당 마켓의 호가창 화면으로 이동한다.
 4. 호가창에서는 매도 호가, 현재가, 매수 호가를 표시한다.
@@ -98,8 +99,8 @@ feature:orderbook
 
 ### 종목 리스트
 
-1. `MarketRepository`가 `market/all`과 `ticker`를 조합한다.
-2. `ObserveMarketSummariesUseCase`가 polling 결과를 노출한다.
+1. `MarketRepository`가 `market/all`과 `ticker`를 조합해 단건 fetch 결과를 만든다.
+2. `ObserveMarketSummariesUseCase`가 polling 주기를 관리하며 결과를 노출한다.
 3. `MarketListViewModel`이 `MarketListContract.UiState`로 변환한다.
 4. `MarketListScreen`이 상태를 렌더링한다.
 
@@ -121,7 +122,7 @@ feature:orderbook
 
 ## 상태 관리 전략
 
-- `MarketList`는 `Loading / Error / Success` 형태의 `MarketListContract.UiState`를 사용한다.
+- `MarketList`는 `items + uiStatus` 형태의 `MarketListContract.UiState`를 사용하고, 탭 상태는 `TabRow + HorizontalPager`를 사용하는 화면 계층에서 관리한다.
 - `OrderBook`는 `meta + content + uiStatus` 구조의 `OrderBookContract.UiState`를 사용한다.
   - `meta`: 종목 정보
   - `content`: 현재 화면에 그릴 수 있는 호가/현재가/등락률
@@ -184,7 +185,7 @@ feature:orderbook
 - 이후 기능을 얹을 최소 실행 구조를 확보한다.
 
 ### 3. 종목 리스트 구현
-- KRW 마켓 리스트, 현재가, 변동률 표시를 먼저 완성한다.
+- KRW 리스트를 먼저 완성한 뒤 KRW/BTC/USDT 탭 전환 구조로 확장한다.
 - REST 기반 데이터 흐름과 기본 화면 상태를 정리한다.
 
 ### 4. 호가창 최소 동작 구현
@@ -201,7 +202,7 @@ feature:orderbook
 
 ## 남은 이슈와 후속 과제
 
-- `MarketListViewModel` 상태 구조를 현재 `OrderBookViewModel` 정리 방향과 비교해 단순화 여부를 점검
+- `MarketListViewModel`의 정렬/필터링과 탭 상태를 현재 구조에서 어떻게 확장할지 점검
 - WebSocket 자동 재연결 백오프 정책
 - `MarketList` 빈 상태 전용 UI
 - stale 데이터 유지 정책 고도화

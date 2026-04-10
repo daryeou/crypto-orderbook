@@ -18,7 +18,7 @@
 - [x] 네트워크 복구 후 활성 화면 자동 재조회 / 재구독
 - [x] 호가창 소켓 오류 전용 retry UI
 - [ ] 종목 정렬 
-- [ ] KRX/BTC/USDT 마켓 대응
+- [x] KRW/BTC/USDT 마켓 대응
 - [ ] 온라인 상태에서 WebSocket 비정상 종료 시 자동 재연결(backoff / jitter)
 - [ ] 연결 복구 UI/UX 세분화
 - [ ] Upbit 공식 WebSocket 에러 코드(`INVALID_AUTH`, `WRONG_FORMAT`, `NO_TICKET`, `NO_TYPE`, `NO_CODES`, `INVALID_PARAM`)를 현재의 일반 소켓 오류 처리에서 분리해 사용자 메시지와 디버깅 정보를 세분화
@@ -38,6 +38,7 @@
 - [ ] 시장 정렬 / 필터링 옵션
 - [ ] 숫자 포맷 공통화
 - [ ] 다크 테마 / 접근성 텍스트 대비 평가
+- [ ] 모듈이 많아질 경우를 대비하여, 일괄성 있는 의존성 관리를 위해 빌드 로직 구현
 
 ---
 
@@ -68,7 +69,7 @@
    - 연결 복구 후 재구독
 
 ### 아직 하지 않은 테스트
-- `MarketRepositoryImpl` polling interval / 실패 정책
+- `ObserveMarketSummariesUseCase` polling interval / 실패 정책
 - 루트 오프라인 오버레이와 스낵바의 Compose UI 테스트
 - Navigation3 백스택 복원과 entry-scoped ViewModel 동작 검증
 
@@ -82,7 +83,7 @@
 
 - [ ] `NetworkStatusRepository`의 초기 상태 계산 로직을 별도 helper로 분리할지 검토
 - [ ] `MarketListViewModel`, `OrderBookViewModel`의 connectivity trigger 조합을 공통 패턴으로 추출할지 검토
-- [ ] `MarketListViewModel` 상태 구조를 현재 `OrderBookViewModel` 정리 방향과 비교해 단순화 여부 검토
+- [ ] `MarketListViewModel`의 정렬/필터링과, 화면 계층이 관리하는 `TabRow + HorizontalPager` 상태를 현재 구조에서 어떻게 확장할지 검토
 - [ ] `stream_type`과 snapshot / realtime 처리 의도를 repository 주석 또는 문서로 명확화
 - [ ] 전역 오프라인 UI를 별도 composable 파일로 분리할지 검토
 
@@ -92,3 +93,4 @@
 
 - 호가창 깊이 차트
 - 즐겨찾기 종목 지원
+- 다국어 지원
