@@ -15,4 +15,9 @@
     <string name="sort_price_desc">현재가 높은 순</string>
     <string name="sort_name_asc">이름 순</string>
     <string name="sort_button_description">정렬 선택</string>
+
+    <string name="search_hint">검색</string>
+    <string name="search_clear_button_description">검색어 지우기</string>
+    <string name="empty_market_title">조회된 코인이 없어요</string>
+    <string name="empty_market_desc">검색어나 필터를 확인하시거나\n잠시 후 다시 시도해 주세요.</string>
 </resources>

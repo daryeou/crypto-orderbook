@@ -4,10 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kwakwonjo.cryptoorderbook.core.domain.model.Market
 import com.kwakwonjo.cryptoorderbook.core.domain.model.Ticker
-import com.kwakwonjo.cryptoorderbook.core.domain.usecase.IsNetworkAvailableUseCase
-import com.kwakwonjo.cryptoorderbook.core.domain.usecase.ObserveConnectivityUseCase
 import com.kwakwonjo.cryptoorderbook.core.domain.usecase.GetMarketListUseCase
 import com.kwakwonjo.cryptoorderbook.core.domain.usecase.GetTickerListUseCase
+import com.kwakwonjo.cryptoorderbook.core.domain.usecase.IsNetworkAvailableUseCase
+import com.kwakwonjo.cryptoorderbook.core.domain.usecase.ObserveConnectivityUseCase
 import com.kwakwonjo.cryptoorderbook.core.model.NetworkAvailability
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -56,47 +56,51 @@ class MarketListViewModel @Inject constructor(
 
     private val marketDataFlow: Flow<MarketListEvent> = combine(
         refreshTrigger.onStart { emit(Unit) },
-        networkAvailability
-    ) { _, availability -> availability }
+        networkAvailability,
+    ) { _, availability ->
+        availability
+    }
         .flatMapLatest { availability ->
-            if (availability == NetworkAvailability.CONNECTED) {
-                flow {
-                    val markets = getMarketListUseCase()
-                    emitAll(
-                        getTickerListUseCase(markets.map { it.market })
-                            .map { tickers ->
-                                MarketListEvent(items = tickers.combineWith(markets))
-                            }
-                    )
-                }.catch { emit(MarketListEvent(isError = true)) }
-            } else {
-                // 오프라인 시 관찰 중단. 이전 데이터는 아래 scan에서 보존됨
-                emptyFlow()
+            if (availability != NetworkAvailability.CONNECTED) {
+                return@flatMapLatest emptyFlow()
+            }
+
+            flow {
+                val markets = getMarketListUseCase()
+                emitAll(
+                    getTickerListUseCase(markets.map { it.market })
+                        .map { tickers ->
+                            MarketListEvent(items = tickers.combineWith(markets))
+                        },
+                )
+            }.catch {
+                emit(MarketListEvent(isError = true))
             }
         }
         .scan(MarketListEvent()) { previous, payload ->
-            // 새로운 데이터가 있으면 업데이트, 에러 시에는 이전 아이템 유지
             MarketListEvent(
                 items = payload.items.ifEmpty { previous.items },
-                isError = payload.isError
+                isError = payload.isError,
             )
         }
 
     val uiState: StateFlow<MarketListContract.UiState> = combine(
         marketDataFlow,
-        networkAvailability
+        networkAvailability,
     ) { event, availability ->
         MarketListContract.UiState(
             items = event.items,
             uiStatus = when {
-                event.isError ->
+                event.isError || availability == NetworkAvailability.DISCONNECTED -> {
                     MarketListContract.UiStatus.ERROR
+                }
 
-                event.items.isEmpty() ->
+                event.items.isEmpty() -> {
                     MarketListContract.UiStatus.INITIAL_LOADING
+                }
 
                 else -> MarketListContract.UiStatus.IDLE
-            }
+            },
         )
     }
         .distinctUntilChanged()
@@ -104,9 +108,9 @@ class MarketListViewModel @Inject constructor(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
             initialValue = MarketListContract.UiState(
-                emptyList(),
-                MarketListContract.UiStatus.INITIAL_LOADING
-            )
+                items = emptyList(),
+                uiStatus = MarketListContract.UiStatus.INITIAL_LOADING,
+            ),
         )
 
     fun retry() {

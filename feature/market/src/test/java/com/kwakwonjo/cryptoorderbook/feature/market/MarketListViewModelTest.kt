@@ -26,7 +26,7 @@ class MarketListViewModelTest {
     val dispatcherRule = MainDispatcherRule()
 
     @Test
-    fun `offline initial state keeps loading without starting market requests`() = runTest {
+    fun `offline initial state exposes error without starting market requests`() = runTest {
         val repository = FakeMarketRepository()
         val viewModel = createViewModel(
             repository = repository,
@@ -37,7 +37,7 @@ class MarketListViewModelTest {
             assertEquals(
                 MarketListContract.UiState(
                     items = emptyList(),
-                    uiStatus = MarketListContract.UiStatus.INITIAL_LOADING,
+                    uiStatus = MarketListContract.UiStatus.ERROR,
                 ),
                 awaitItem(),
             )
@@ -150,10 +150,24 @@ class MarketListViewModelTest {
 
             networkStatusRepository.setStatus(NetworkAvailability.DISCONNECTED)
             runCurrent()
-            expectNoEvents()
+            assertEquals(
+                MarketListContract.UiState(
+                    items = listOf(marketItem(firstMarkets[0], firstTickers[0])),
+                    uiStatus = MarketListContract.UiStatus.ERROR,
+                ),
+                awaitItem(),
+            )
 
             networkStatusRepository.setStatus(NetworkAvailability.CONNECTED)
             runCurrent()
+
+            assertEquals(
+                MarketListContract.UiState(
+                    items = listOf(marketItem(firstMarkets[0], firstTickers[0])),
+                    uiStatus = MarketListContract.UiStatus.IDLE,
+                ),
+                awaitItem(),
+            )
 
             assertEquals(
                 MarketListContract.UiState(
