@@ -8,9 +8,6 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose.compiler)
-    alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.hilt)
-    alias(libs.plugins.kapt)
 }
 
 kotlin {
@@ -18,7 +15,7 @@ kotlin {
 }
 
 android {
-    namespace = "$applicationIdValue.feature.market"
+    namespace = "$applicationIdValue.core.ui"
     compileSdk = compileSdkValue
 
     defaultConfig {
@@ -37,33 +34,21 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:model"))
-    implementation(project(":core:domain"))
     implementation(project(":core:designsystem"))
-    implementation(project(":core:ui"))
 
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.viewmodel.ktx)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.bundles.androidx.compose)
-    implementation(libs.bundles.coil)
-    implementation(libs.androidx.navigation3.runtime)
-    implementation(libs.kotlinx.serialization.json)
 
-    implementation(libs.hilt.android)
-    kapt(libs.hilt.android.compiler)
-    implementation(libs.hilt.navigation.compose)
+    implementation(libs.bundles.coil)
 
     testImplementation(libs.junit4)
-    testImplementation(libs.mockk)
-    testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.turbine)
+
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.espresso.core)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
 
     debugImplementation(libs.bundles.androidx.compose.debug)
-}
-
-kapt {
-    correctErrorTypes = true
 }

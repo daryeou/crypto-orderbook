@@ -1,6 +1,4 @@
-﻿package com.kwakwonjo.cryptoorderbook.core.domain.model
-
-import com.kwakwonjo.cryptoorderbook.core.model.MarketType
+package com.kwakwonjo.cryptoorderbook.core.model
 
 data class Market(
     val market: String,
@@ -14,5 +12,3 @@ data class Market(
         else -> MarketType.UNKNOWN
     }
 }
-
-

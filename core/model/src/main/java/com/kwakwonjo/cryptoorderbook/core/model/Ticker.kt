@@ -1,4 +1,4 @@
-package com.kwakwonjo.cryptoorderbook.core.domain.model
+package com.kwakwonjo.cryptoorderbook.core.model
 
 data class Ticker(
     val market: String,

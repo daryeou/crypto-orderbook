@@ -44,6 +44,7 @@ import com.kwakwonjo.cryptoorderbook.feature.market.component.MarketListContent
 import com.kwakwonjo.cryptoorderbook.feature.market.component.MarketSearchBar
 import com.kwakwonjo.cryptoorderbook.feature.market.component.MarketTypeTabs
 import com.kwakwonjo.cryptoorderbook.feature.market.component.SortOrder
+import com.kwakwonjo.cryptoorderbook.feature.market.component.TopBar
 import kotlinx.coroutines.launch
 
 @Composable
@@ -61,24 +62,12 @@ fun MarketListScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Logo(isVisible = searchQuery.isEmpty())
-                MarketSearchBar(
-                    modifier = Modifier.weight(1f),
-                    query = searchQuery,
-                    onQueryChange = { searchQuery = it },
-                )
-                HorizontalSpacer(12.dp)
-                SortMenu(
-                    currentSortOrder = currentSortOrder,
-                    onChangeSortOrder = { sortOrder -> currentSortOrder = sortOrder },
-                )
-            }
+            TopBar(
+                searchQuery = searchQuery,
+                currentSortOrder = currentSortOrder,
+                onChangeSearchQuery = { query -> searchQuery = query },
+                onChangeSortOrder = { sortOrder -> currentSortOrder = sortOrder },
+            )
         },
     ) { innerPadding ->
         Column(
@@ -121,78 +110,6 @@ fun MarketListScreen(
                         marketTypes = marketTypes,
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun Logo(isVisible: Boolean) {
-    AnimatedVisibility(
-        visible = isVisible,
-        modifier = Modifier.padding(end = 12.dp),
-        enter = expandHorizontally(expandFrom = Alignment.Start) + fadeIn(),
-        exit = shrinkHorizontally(shrinkTowards = Alignment.Start) + fadeOut(),
-    ) {
-        Text(
-            text = stringResource(R.string.title_market_list),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-            fontWeight = FontWeight.Bold,
-        )
-        HorizontalSpacer(12.dp)
-    }
-}
-
-@Composable
-private fun SortMenu(
-    currentSortOrder: SortOrder,
-    onChangeSortOrder: (SortOrder) -> Unit,
-) {
-    var isSortMenuExpanded by remember { mutableStateOf(false) }
-
-    Box {
-        IconButton(onClick = { isSortMenuExpanded = true }) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.List,
-                contentDescription = stringResource(R.string.sort_button_description),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-        }
-
-        DropdownMenu(
-            expanded = isSortMenuExpanded,
-            onDismissRequest = { isSortMenuExpanded = false },
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            shape = RoundedCornerShape(12.dp),
-        ) {
-            SortOrder.entries.forEach { order ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = stringResource(order.labelRes),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = if (currentSortOrder == order) {
-                                FontWeight.Bold
-                            } else {
-                                FontWeight.Normal
-                            },
-                        )
-                    },
-                    onClick = {
-                        onChangeSortOrder(order)
-                        isSortMenuExpanded = false
-                    },
-                    leadingIcon = {
-                        if (currentSortOrder == order) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
-                    },
-                )
             }
         }
     }

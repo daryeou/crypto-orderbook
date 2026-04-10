@@ -1,8 +1,8 @@
 ﻿package com.kwakwonjo.cryptoorderbook.core.domain.usecase
 
 import com.kwakwonjo.cryptoorderbook.core.domain.repository.MarketRepository
-import com.kwakwonjo.cryptoorderbook.core.domain.model.Market
-import com.kwakwonjo.cryptoorderbook.core.domain.model.Ticker
+import com.kwakwonjo.cryptoorderbook.core.model.Market
+import com.kwakwonjo.cryptoorderbook.core.model.Ticker
 import javax.inject.Inject
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay

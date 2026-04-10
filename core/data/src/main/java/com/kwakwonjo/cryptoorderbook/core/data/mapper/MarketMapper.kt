@@ -1,7 +1,7 @@
 package com.kwakwonjo.cryptoorderbook.core.data.mapper
 
-import com.kwakwonjo.cryptoorderbook.core.domain.model.Market
-import com.kwakwonjo.cryptoorderbook.core.domain.model.Ticker
+import com.kwakwonjo.cryptoorderbook.core.model.Market
+import com.kwakwonjo.cryptoorderbook.core.model.Ticker
 import com.kwakwonjo.cryptoorderbook.core.network.model.UpbitMarketResponse
 import com.kwakwonjo.cryptoorderbook.core.network.model.UpbitTickerResponse
 

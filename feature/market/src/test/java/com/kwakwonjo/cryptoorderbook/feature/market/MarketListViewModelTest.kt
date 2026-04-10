@@ -1,8 +1,8 @@
 package com.kwakwonjo.cryptoorderbook.feature.market
 
 import app.cash.turbine.test
-import com.kwakwonjo.cryptoorderbook.core.domain.model.Market
-import com.kwakwonjo.cryptoorderbook.core.domain.model.Ticker
+import com.kwakwonjo.cryptoorderbook.core.model.Market
+import com.kwakwonjo.cryptoorderbook.core.model.Ticker
 import com.kwakwonjo.cryptoorderbook.core.domain.repository.MarketRepository
 import com.kwakwonjo.cryptoorderbook.core.domain.repository.NetworkStatusRepository
 import com.kwakwonjo.cryptoorderbook.core.domain.usecase.GetMarketListUseCase
@@ -296,16 +296,8 @@ class MarketListViewModelTest {
         market: Market,
         ticker: Ticker,
     ): MarketListContract.MarketItem = MarketListContract.MarketItem(
-        info = MarketListContract.MarketStaticInfo(
-            market = market.market,
-            marketType = market.marketType,
-            koreanName = market.koreanName,
-            englishName = market.englishName,
-        ),
-        priceState = MarketListContract.MarketPrice(
-            tradePrice = ticker.tradePrice,
-            signedChangeRate = ticker.signedChangeRate,
-        )
+        market = market,
+        ticker = ticker,
     )
 
     private sealed interface MarketListResult {

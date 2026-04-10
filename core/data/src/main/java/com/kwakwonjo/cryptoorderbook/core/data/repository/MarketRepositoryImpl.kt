@@ -2,8 +2,8 @@
 
 import com.kwakwonjo.cryptoorderbook.core.data.mapper.toDomain
 import com.kwakwonjo.cryptoorderbook.core.domain.repository.MarketRepository
-import com.kwakwonjo.cryptoorderbook.core.domain.model.Market
-import com.kwakwonjo.cryptoorderbook.core.domain.model.Ticker
+import com.kwakwonjo.cryptoorderbook.core.model.Market
+import com.kwakwonjo.cryptoorderbook.core.model.Ticker
 import com.kwakwonjo.cryptoorderbook.core.network.api.UpbitApi
 import javax.inject.Inject
 

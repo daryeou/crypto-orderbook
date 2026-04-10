@@ -2,8 +2,8 @@ package com.kwakwonjo.cryptoorderbook.feature.market
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.kwakwonjo.cryptoorderbook.core.domain.model.Market
-import com.kwakwonjo.cryptoorderbook.core.domain.model.Ticker
+import com.kwakwonjo.cryptoorderbook.core.model.Market
+import com.kwakwonjo.cryptoorderbook.core.model.Ticker
 import com.kwakwonjo.cryptoorderbook.core.domain.usecase.GetMarketListUseCase
 import com.kwakwonjo.cryptoorderbook.core.domain.usecase.GetTickerListUseCase
 import com.kwakwonjo.cryptoorderbook.core.domain.usecase.IsNetworkAvailableUseCase
@@ -124,16 +124,8 @@ class MarketListViewModel @Inject constructor(
             val market = marketMap[ticker.market] ?: return@mapNotNull null
 
             MarketListContract.MarketItem(
-                info = MarketListContract.MarketStaticInfo(
-                    market = market.market,
-                    marketType = market.marketType,
-                    koreanName = market.koreanName,
-                    englishName = market.englishName,
-                ),
-                priceState = MarketListContract.MarketPrice(
-                    tradePrice = ticker.tradePrice,
-                    signedChangeRate = ticker.signedChangeRate,
-                ),
+                market = market,
+                ticker = ticker,
             )
         }
     }
