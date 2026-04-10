@@ -24,7 +24,6 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.scan
@@ -90,11 +89,9 @@ class MarketListViewModel @Inject constructor(
         MarketListContract.UiState(
             items = event.items,
             uiStatus = when {
-                // 네트워크는 있는데 데이터 요청에서 에러가 난 경우
-                event.isError && availability == NetworkAvailability.CONNECTED ->
+                event.isError ->
                     MarketListContract.UiStatus.ERROR
 
-                // 아직 데이터가 한 번도 로드되지 않은 경우
                 event.items.isEmpty() ->
                     MarketListContract.UiStatus.INITIAL_LOADING
 
@@ -106,7 +103,6 @@ class MarketListViewModel @Inject constructor(
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-            // 시작점은 무조건 INITIAL_LOADING. 첫 데이터가 올 때까지 이 상태가 유지됨
             initialValue = MarketListContract.UiState(
                 emptyList(),
                 MarketListContract.UiStatus.INITIAL_LOADING
@@ -119,16 +115,21 @@ class MarketListViewModel @Inject constructor(
 
     private fun List<Ticker>.combineWith(markets: List<Market>): List<MarketListContract.MarketItem> {
         val marketMap = markets.associateBy { it.market }
+
         return mapNotNull { ticker ->
             val market = marketMap[ticker.market] ?: return@mapNotNull null
 
             MarketListContract.MarketItem(
-                market = market.market,
-                marketType = market.marketType,
-                koreanName = market.koreanName,
-                englishName = market.englishName,
-                tradePrice = ticker.tradePrice,
-                signedChangeRate = ticker.signedChangeRate,
+                info = MarketListContract.MarketStaticInfo(
+                    market = market.market,
+                    marketType = market.marketType,
+                    koreanName = market.koreanName,
+                    englishName = market.englishName,
+                ),
+                priceState = MarketListContract.MarketPrice(
+                    tradePrice = ticker.tradePrice,
+                    signedChangeRate = ticker.signedChangeRate,
+                ),
             )
         }
     }

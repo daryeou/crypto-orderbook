@@ -212,6 +212,42 @@ class MarketListViewModelTest {
         }
     }
 
+    @Test
+    fun `success state ignores tickers that are not in fetched markets`() = runTest {
+        val markets = listOf(
+            market("KRW-BTC", "Bitcoin KRW", "Bitcoin"),
+            market("KRW-ETH", "Ethereum KRW", "Ethereum"),
+        )
+        val tickers = listOf(
+            ticker("KRW-XRP", tradePrice = 3_000.0, signedChangeRate = 0.05),
+            ticker("KRW-BTC", tradePrice = 148_956_000.0, signedChangeRate = 0.0031),
+            ticker("KRW-ETH", tradePrice = 5_486_000.0, signedChangeRate = -0.0124),
+        )
+        val repository = FakeMarketRepository().apply {
+            enqueueMarketListSuccess(markets)
+            enqueueTickerListSuccess(tickers)
+        }
+        val viewModel = createViewModel(
+            repository = repository,
+            networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.CONNECTED),
+        )
+
+        viewModel.uiState.test {
+            assertEquals(
+                MarketListContract.UiState(
+                    items = listOf(
+                        marketItem(markets[0], tickers[1]),
+                        marketItem(markets[1], tickers[2]),
+                    ),
+                    uiStatus = MarketListContract.UiStatus.IDLE,
+                ),
+                awaitItem(),
+            )
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     private fun createViewModel(
         repository: MarketRepository,
         networkStatusRepository: FakeNetworkStatusRepository,
@@ -246,12 +282,16 @@ class MarketListViewModelTest {
         market: Market,
         ticker: Ticker,
     ): MarketListContract.MarketItem = MarketListContract.MarketItem(
-        market = market.market,
-        marketType = market.marketType,
-        koreanName = market.koreanName,
-        englishName = market.englishName,
-        tradePrice = ticker.tradePrice,
-        signedChangeRate = ticker.signedChangeRate,
+        info = MarketListContract.MarketStaticInfo(
+            market = market.market,
+            marketType = market.marketType,
+            koreanName = market.koreanName,
+            englishName = market.englishName,
+        ),
+        priceState = MarketListContract.MarketPrice(
+            tradePrice = ticker.tradePrice,
+            signedChangeRate = ticker.signedChangeRate,
+        )
     )
 
     private sealed interface MarketListResult {

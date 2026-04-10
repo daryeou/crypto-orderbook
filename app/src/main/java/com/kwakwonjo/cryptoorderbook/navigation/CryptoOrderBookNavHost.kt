@@ -8,6 +8,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
+import com.kwakwonjo.cryptoorderbook.feature.market.MarketListNavKey
 import com.kwakwonjo.cryptoorderbook.feature.market.MarketListRoute
 import com.kwakwonjo.cryptoorderbook.feature.orderbook.OrderBookNavKey
 import com.kwakwonjo.cryptoorderbook.feature.orderbook.OrderBookRoute
@@ -18,7 +19,7 @@ fun CryptoOrderBookNavHost(
     modifier: Modifier = Modifier,
     onFinishRequest: () -> Unit,
 ) {
-    val backStack = rememberNavBackStack(AppDestination.MarketList)
+    val backStack = rememberNavBackStack(MarketListNavKey)
 
     NavDisplay(
         backStack = backStack,
@@ -37,7 +38,7 @@ fun CryptoOrderBookNavHost(
             rememberViewModelStoreNavEntryDecorator(),
         ),
         entryProvider = entryProvider {
-            entry<AppDestination.MarketList> {
+            entry<MarketListNavKey> {
                 MarketListRoute(
                     onMarketClick = { market, marketType, koreanName ->
                         backStack.add(

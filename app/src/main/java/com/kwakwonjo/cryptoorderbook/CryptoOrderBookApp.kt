@@ -6,6 +6,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
@@ -42,7 +43,7 @@ fun CryptoOrderBookApp(
     val snackbarHostState = remember { SnackbarHostState() }
     val interactionSource = remember { MutableInteractionSource() }
     val offlineSnackbarMessage = stringResource(R.string.global_offline_snackbar)
-    val offlineOverlayMessage = stringResource(R.string.global_offline_overlay_message)
+
     var previousStatus by remember { mutableStateOf(networkAvailability) }
 
     LaunchedEffect(networkAvailability, offlineSnackbarMessage) {
@@ -72,41 +73,13 @@ fun CryptoOrderBookApp(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding),
         ) {
             CryptoOrderBookNavHost(
                 modifier = Modifier.fillMaxSize(),
                 onFinishRequest = onFinishRequest,
             )
-
-            if (networkAvailability == NetworkAvailability.DISCONNECTED) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.4f))
-                        .clickable(
-                            interactionSource = interactionSource,
-                            indication = null,
-                            onClick = {},
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 32.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        CircularProgressIndicator()
-                        Text(
-                            text = offlineOverlayMessage,
-                            modifier = Modifier.padding(top = 16.dp),
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodyLarge,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                }
-            }
         }
     }
 }

@@ -56,6 +56,7 @@ Windows에서는 `gradlew.bat`를 사용합니다.
 
 ```text
 app
+  -> core:designsystem
   -> feature:market / feature:orderbook
        -> core:domain
             -> core:data
@@ -66,6 +67,7 @@ app
 ### 모듈 역할
 
 - `app`: Application, Activity, Navigation3 NavHost, 전역 오프라인 UI
+- `core:designsystem`: Compose theme, color, typography 같은 공통 디자인 토큰
 - `core:model`: 공유 enum과 연결 상태 (`MarketType`, `NetworkAvailability`, `ConnectionState`)
 - `core:domain`: repository contract, use case, 거래소/호가 domain 모델 (`Market`, `Ticker`, `OrderBookEvent`)
 - `core:network`: REST / WebSocket DTO와 클라이언트
@@ -134,7 +136,7 @@ app
 ### 종목 리스트
 
 ```mermaid
-flowchart LR
+graph LR
     A["Upbit REST: market/all"] --> B["MarketRepository"]
     C["Upbit REST: ticker"] --> B
     B --> D["GetMarketListUseCase"]
@@ -148,9 +150,9 @@ flowchart LR
 ### 호가창
 
 ```mermaid
-flowchart LR
-    A["Upbit WebSocket<br/>orderbook"] --> C["OrderBookRepository"]
-    B["Upbit WebSocket<br/>ticker"] --> C
+graph LR
+    A["Upbit WebSocket (orderbook)"] --> C["OrderBookRepository"]
+    B["Upbit WebSocket (ticker)"] --> C
     C --> D["ObserveOrderBookUseCase"]
     D --> E["OrderBookViewModel"]
     E --> F["OrderBookContract.UiState"]
@@ -160,7 +162,7 @@ flowchart LR
 ### 전역 네트워크 상태
 
 ```mermaid
-flowchart LR
+graph LR
     A["ConnectivityManager"] --> B["NetworkStatusRepository"]
     B --> C["ObserveConnectivityUseCase"]
     C --> D["AppRootViewModel"]
@@ -192,10 +194,12 @@ flowchart LR
 | 라이브러리 | 용도 | 선택 근거 |
 |---|---|---|
 | Jetpack Compose | UI | 과제 필수, Route/Screen 분리에 적합 |
+| core:designsystem | 공통 테마 | 색상, 타이포그래피, 이후 공통 컴포넌트 추출의 기준점 |
 | Navigation3 | 화면 이동 | serializable key 기반 back stack과 엔트리 단위 상태 복원 |
 | Hilt | DI | 모듈 간 repository / network binding을 단순하게 유지 |
 | Retrofit | REST API | Upbit REST 클라이언트 구성이 간결함 |
 | OkHttp WebSocket | 실시간 호가 / 현재가 | `callbackFlow` 래핑에 적합 |
+| Coil 3 (`coil-compose`, `coil-network-okhttp`) | 코인 아이콘 로딩 | Compose에서 비동기 이미지를 바로 붙일 수 있고, OkHttp 스택과 맞춰 네트워크/캐시 동작을 일관되게 가져가기 좋음 |
 | kotlinx.serialization | JSON 직렬화 | REST / WS 모델을 일관되게 처리 가능 |
 | Coroutines / Flow | 비동기 처리 | StateFlow, callbackFlow, 테스트 도구와 궁합이 좋음 |
 | JUnit4 | 단위 테스트 실행 | Android 단위 테스트 기본 구성이 단순함 |

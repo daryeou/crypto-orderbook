@@ -172,6 +172,33 @@
 - **수정 내용**: `MarketRepository`는 단건 fetch만 담당하고 `ObserveMarketSummariesUseCase`가 polling을 관리하도록 유지했다. 이후 `MarketListViewModel`은 전체 목록 상태만 노출하고, `MarketListScreen`이 `TabRow + HorizontalPager`로 시장 전환을 맡도록 구조를 단순화하는 작업을 진행했다
 - **검증**: 리팩터링 중간마다 `MarketListViewModelTest`, `assembleDebug`를 다시 확인하면서 상태 단순화 이후에도 빌드와 테스트가 유지되는지 점검했다
 
+### 사례 15: 앱 테마를 designsystem 모듈로 이동
+- **맥락**: UI 대규모 수정 전에 공통 테마와 디자인 토큰 위치를 먼저 정리하던 단계
+- **프롬프트**: 초기 참고 프로젝트에는 있었지만 비워 둔 `core:designsystem` 모듈을 실제 Compose theme 모듈로 전환하고, 제안한 다크 금융 앱 톤의 색상/타이포그래피를 넣고 싶다는 요청
+- **AI 출력**: `core:designsystem`를 Compose library로 전환하고, `Color.kt`, `Typography.kt`, `Theme.kt`를 추가한 뒤 `app`의 `CryptoOrderBookTheme`가 이를 감싸도록 연결하는 방향을 제안
+- **판단**: 수락
+- **이유**: 지금까지는 앱 모듈 안의 단순 `Theme.kt` 하나에 MaterialTheme 기본값만 두고 있어서, 이후 공통 컴포넌트나 색상 정책을 확장하기 어려웠다
+- **수정 내용**: `core:designsystem`의 Gradle 설정을 Compose library 기준으로 바꾸고, 다크 배경/상승·하락 컬러/타이포그래피를 추가했다. `app`은 `CryptoOrderBookTheme`를 통해 designsystem theme를 사용하도록 연결했다
+- **검증**: `:core:designsystem:assembleDebug`와 `:app:assembleDebug`로 모듈과 앱이 모두 빌드 가능한지 확인했다
+
+### 사례 16: 코인 아이콘 로딩용 Coil 3 의존성 추가
+- **맥락**: 종목 리스트에 코인 아이콘을 붙이기 전에 이미지 로딩 스택을 정하던 단계
+- **프롬프트**: Coil 공식 Jetpack Compose 안내를 기준으로 `coil-compose`, `coil-network-okhttp` 두 의존성을 추가해 달라는 요청
+- **AI 출력**: 버전 카탈로그에 Coil 3.4.0 항목을 추가하고, 실제 아이콘 UI가 들어갈 `feature:market` 모듈에 두 의존성을 연결하는 방향으로 정리
+- **판단**: 수락
+- **이유**: 앱 모듈에만 넣으면 feature 모듈 Compose 코드에서 바로 쓸 수 없고, 현재 요구는 시장 리스트 아이콘 로딩이라 `feature:market` 범위로 넣는 편이 의존성 범위를 최소화한다
+- **수정 내용**: `gradle/libs.versions.toml`에 `coil-compose`, `coil-network-okhttp`를 추가하고 `feature:market/build.gradle.kts`에 `implementation(libs.coil.compose)`, `implementation(libs.coil.network.okhttp)`를 연결했다
+- **검증**: 의존성 설정만 반영했고, 현재 작업 트리에 진행 중인 UI 변경이 많아 이번 턴에서는 별도 빌드 검증은 수행하지 않았다
+
+### 사례 17: Coil 의존성을 Compose bundle로 이동
+- **맥락**: 개별 dependency 선언 대신 버전 카탈로그 번들 기준으로 Compose 의존성을 정리하던 단계
+- **프롬프트**: 방금 추가한 Coil 의존성을 `androidx-compose` bundle에 포함해 달라는 요청
+- **AI 출력**: `gradle/libs.versions.toml`의 `androidx-compose` bundle에 `coil-compose`, `coil-network-okhttp`를 포함시키고, `feature:market`의 개별 Coil 선언을 제거하는 방향으로 정리
+- **판단**: 수락
+- **이유**: 현재 프로젝트가 Compose 공통 의존성을 bundle로 관리하고 있어서 같은 성격의 라이브러리도 같은 기준으로 묶는 편이 선언 중복을 줄이고 추후 모듈 추가 시 일관성이 좋다
+- **수정 내용**: `androidx-compose` bundle에 Coil 두 항목을 추가하고 `feature:market/build.gradle.kts`의 개별 `implementation(libs.coil.compose)`, `implementation(libs.coil.network.okhttp)`는 삭제했다
+- **검증**: 번들 선언과 개별 선언 제거만 반영했고, 빌드 검증은 이번 턴에서 수행하지 않았다
+
 ---
 
 ## AI가 만든 실수

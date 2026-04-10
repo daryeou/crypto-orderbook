@@ -3,7 +3,12 @@ package com.kwakwonjo.cryptoorderbook.feature.market
 import androidx.compose.runtime.Composable
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation3.runtime.NavKey
 import com.kwakwonjo.cryptoorderbook.core.model.MarketType
+import kotlinx.serialization.Serializable
+
+@Serializable
+data object MarketListNavKey : NavKey
 
 @Composable
 fun MarketListRoute(

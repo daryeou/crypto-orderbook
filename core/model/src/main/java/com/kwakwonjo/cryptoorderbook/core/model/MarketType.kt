@@ -1,8 +1,8 @@
 package com.kwakwonjo.cryptoorderbook.core.model
 
-enum class MarketType {
-    KRW,
-    BTC,
-    USDT,
-    UNKNOWN;
+enum class MarketType(val isVisible: Boolean) {
+    KRW(true),
+    BTC(true),
+    USDT(true),
+    UNKNOWN(false);
 }
