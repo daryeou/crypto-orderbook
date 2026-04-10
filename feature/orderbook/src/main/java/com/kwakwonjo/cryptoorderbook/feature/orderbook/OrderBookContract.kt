@@ -1,5 +1,7 @@
 package com.kwakwonjo.cryptoorderbook.feature.orderbook
 
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
 import com.kwakwonjo.cryptoorderbook.core.domain.model.OrderBookEvent
 import com.kwakwonjo.cryptoorderbook.core.model.MarketType
 
@@ -22,6 +24,7 @@ sealed interface OrderBookContract {
         SOCKET_ERROR
     }
 
+    @Stable
     data class UiState(
         val marketInfo: MarketInfo,
         val orderBookData: OrderBookData?,

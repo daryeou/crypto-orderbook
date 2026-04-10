@@ -8,8 +8,8 @@ import kotlinx.coroutines.flow.Flow
 class ObserveOrderBookUseCase @Inject constructor(
     private val orderBookRepository: OrderBookRepository,
 ) {
-    operator fun invoke(market: String): Flow<OrderBookEvent> {
-        return orderBookRepository.observeOrderBook(market)
+    operator fun invoke(market: String, orderbookUnit: Int): Flow<OrderBookEvent> {
+        return orderBookRepository.observeOrderBook(market, orderbookUnit)
     }
 }
 

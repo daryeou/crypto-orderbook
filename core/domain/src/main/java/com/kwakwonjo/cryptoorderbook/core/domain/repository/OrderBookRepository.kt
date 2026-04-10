@@ -4,7 +4,7 @@ import com.kwakwonjo.cryptoorderbook.core.domain.model.OrderBookEvent
 import kotlinx.coroutines.flow.Flow
 
 interface OrderBookRepository {
-    fun observeOrderBook(market: String): Flow<OrderBookEvent>
+    fun observeOrderBook(market: String, orderbookUnit: Int): Flow<OrderBookEvent>
 }
 
 

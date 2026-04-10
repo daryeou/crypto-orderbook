@@ -18,11 +18,11 @@ class OrderBookRepositoryImpl @Inject constructor(
     private val upbitWebSocketClient: UpbitWebSocketClient,
 ) : OrderBookRepository {
 
-    override fun observeOrderBook(market: String): Flow<OrderBookEvent> {
+    override fun observeOrderBook(market: String, orderbookUnit: Int): Flow<OrderBookEvent> {
         val initialPayload = OrderBookEvent(connectionState = ConnectionState.Connecting)
 
         return upbitWebSocketClient.observeUpbitStream(
-            subscription = UpbitSubscription(market = market),
+            subscription = UpbitSubscription(market = market, orderbookUnit = orderbookUnit),
         ).runningFold(initialPayload) { current, frame ->
             current.reduce(frame)
         }.catch { throwable ->

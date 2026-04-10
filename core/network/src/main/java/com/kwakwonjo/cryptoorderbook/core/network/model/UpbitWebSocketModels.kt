@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 
 data class UpbitSubscription(
     val market: String,
-    val orderbookUnit: Int = 15,
+    val orderbookUnit: Int,
 )
 
 sealed interface UpbitWsFrame

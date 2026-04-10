@@ -18,10 +18,12 @@ internal val DarkColorScheme = darkColorScheme(
 
 data class LocalExtensionColors(
     val tradeUpRed: Color,
-    val tradeDownGreen: Color
+    val tradeDownGreen: Color,
+    val scrim: Color
 )
 
 internal val DarkLocalExtensionColors = LocalExtensionColors(
     tradeUpRed = Color(0xFFE84855),
-    tradeDownGreen = Color(0xFF2DC496)
+    tradeDownGreen = Color(0xFF2DC496),
+    scrim = Color(0xFF000000).copy(alpha = 0.6f)
 )

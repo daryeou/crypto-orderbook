@@ -7,6 +7,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation3.runtime.NavKey
+import com.kwakwonjo.cryptoorderbook.core.model.MarketType
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class OrderBookNavKey(
+    val market: String,
+    val marketType: MarketType,
+    val koreanName: String,
+) : NavKey
 
 @Composable
 fun OrderBookRoute(
@@ -14,7 +24,6 @@ fun OrderBookRoute(
     viewModel: OrderBookViewModel,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var previousStatus by remember { mutableStateOf(uiState.uiStatus) }
 
     OrderBookScreen(
         uiState = uiState,

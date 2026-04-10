@@ -62,7 +62,7 @@ class OrderBookViewModel @AssistedInject constructor(
     ) { _, availability -> availability }
         .flatMapLatest { availability ->
             if (availability == NetworkAvailability.CONNECTED) {
-                observeOrderBookUseCase(navKey.market)
+                observeOrderBookUseCase(navKey.market, OrderBookUnit)
             } else {
                 flowOf(OrderBookEvent(connectionState = ConnectionState.Error))
             }
@@ -80,7 +80,7 @@ class OrderBookViewModel @AssistedInject constructor(
             marketInfo = marketInfo,
             orderBookData = payload.toContent(),
             uiStatus = when {
-                payload.connectionState == ConnectionState.Error && availability == NetworkAvailability.CONNECTED-> OrderBookContract.UiStatus.SOCKET_ERROR
+                payload.connectionState == ConnectionState.Error -> OrderBookContract.UiStatus.SOCKET_ERROR
                 payload.orderBook == null -> OrderBookContract.UiStatus.INITIAL_LOADING
                 // 오프라인도 IDLE 상태로 유지
                 else -> OrderBookContract.UiStatus.IDLE
