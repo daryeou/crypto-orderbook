@@ -3,17 +3,18 @@ package com.kwakwonjo.cryptoorderbook
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.core.view.WindowCompat
-import com.kwakwonjo.cryptoorderbook.theme.CryptoOrderBookTheme
+import androidx.activity.enableEdgeToEdge
+import com.kwakwonjo.cryptoorderbook.core.designsystem.theme.CryptoAppTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
+        enableEdgeToEdge()
+
         setContent {
-            CryptoOrderBookTheme {
+            CryptoAppTheme {
                 CryptoOrderBookApp(
                     onFinishRequest = ::finish,
                 )
