@@ -7,8 +7,11 @@ import androidx.compose.ui.tooling.preview.Preview
 @Composable
 private fun MarketListPreview() {
     MarketListScreen(
-        uiState = MarketListContract.UiState.Success(PreviewData.marketSummaries),
-        onMarketClick = { _, _ -> },
+        uiState = MarketListContract.UiState(
+            items = PreviewData.marketItems,
+            uiStatus = MarketListContract.UiStatus.IDLE,
+        ),
+        onMarketClick = { _, _, _ -> },
         onRetry = {},
     )
 }

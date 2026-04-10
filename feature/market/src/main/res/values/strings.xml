@@ -1,5 +1,5 @@
 <resources>
-    <string name="market_list_title">Upbit KRW 마켓</string>
+    <string name="market_list_title">Upbit 마켓</string>
     <string name="market_list_loading">마켓 정보를 불러오는 중입니다.</string>
     <string name="market_list_error">마켓 정보를 불러오지 못했습니다.</string>
     <string name="market_list_retry">다시 시도</string>

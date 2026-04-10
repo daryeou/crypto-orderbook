@@ -1,27 +1,25 @@
 ﻿package com.kwakwonjo.cryptoorderbook.core.data.repository
 
+import com.kwakwonjo.cryptoorderbook.core.data.mapper.toDomain
+import com.kwakwonjo.cryptoorderbook.core.domain.model.OrderBookEvent
 import com.kwakwonjo.cryptoorderbook.core.domain.repository.OrderBookRepository
 import com.kwakwonjo.cryptoorderbook.core.model.ConnectionState
-import com.kwakwonjo.cryptoorderbook.core.model.OrderBook
-import com.kwakwonjo.cryptoorderbook.core.model.OrderBookPayload
-import com.kwakwonjo.cryptoorderbook.core.model.OrderBookUnit
-import com.kwakwonjo.cryptoorderbook.core.model.TickerSnapshot
 import com.kwakwonjo.cryptoorderbook.core.network.model.UpbitOrderBookFrame
 import com.kwakwonjo.cryptoorderbook.core.network.model.UpbitSubscription
 import com.kwakwonjo.cryptoorderbook.core.network.model.UpbitTickerFrame
 import com.kwakwonjo.cryptoorderbook.core.network.model.UpbitWsFrame
 import com.kwakwonjo.cryptoorderbook.core.network.websocket.UpbitWebSocketClient
-import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.runningFold
+import javax.inject.Inject
 
 class OrderBookRepositoryImpl @Inject constructor(
     private val upbitWebSocketClient: UpbitWebSocketClient,
 ) : OrderBookRepository {
 
-    override fun observeOrderBook(market: String): Flow<OrderBookPayload> {
-        val initialPayload = OrderBookPayload(connectionState = ConnectionState.Connecting)
+    override fun observeOrderBook(market: String): Flow<OrderBookEvent> {
+        val initialPayload = OrderBookEvent(connectionState = ConnectionState.Connecting)
 
         return upbitWebSocketClient.observeUpbitStream(
             subscription = UpbitSubscription(market = market),
@@ -29,7 +27,7 @@ class OrderBookRepositoryImpl @Inject constructor(
             current.reduce(frame)
         }.catch { throwable ->
             emit(
-                OrderBookPayload(
+                OrderBookEvent(
                     connectionState = ConnectionState.Error,
                     errorMessage = throwable.message,
                 )
@@ -37,33 +35,17 @@ class OrderBookRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun OrderBookPayload.reduce(frame: UpbitWsFrame): OrderBookPayload {
+    private fun OrderBookEvent.reduce(frame: UpbitWsFrame): OrderBookEvent {
         return when (frame) {
             is UpbitOrderBookFrame -> copy(
                 connectionState = ConnectionState.Connected,
-                orderBook = OrderBook(
-                    market = frame.market,
-                    asks = frame.units.map { unit ->
-                        OrderBookUnit(price = unit.askPrice, size = unit.askSize)
-                    },
-                    bids = frame.units.map { unit ->
-                        OrderBookUnit(price = unit.bidPrice, size = unit.bidSize)
-                    },
-                    totalAskSize = frame.totalAskSize,
-                    totalBidSize = frame.totalBidSize,
-                    timestamp = frame.timestamp,
-                ),
+                orderBook = frame.toDomain(),
                 errorMessage = null,
             )
 
             is UpbitTickerFrame -> copy(
                 connectionState = ConnectionState.Connected,
-                ticker = TickerSnapshot(
-                    market = frame.market,
-                    tradePrice = frame.tradePrice,
-                    signedChangeRate = frame.signedChangeRate,
-                    timestamp = frame.timestamp,
-                ),
+                ticker = frame.toDomain(),
                 errorMessage = null,
             )
         }

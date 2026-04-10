@@ -1,15 +1,17 @@
 package com.kwakwonjo.cryptoorderbook.feature.orderbook
 
-import com.kwakwonjo.cryptoorderbook.core.model.OrderBook
+import com.kwakwonjo.cryptoorderbook.core.domain.model.OrderBookEvent
+import com.kwakwonjo.cryptoorderbook.core.model.MarketType
 
 sealed interface OrderBookContract {
-    data class Meta(
+    data class MarketInfo(
         val market: String,
-        val marketLabel: String,
+        val marketType: MarketType,
+        val koreanName: String,
     )
 
-    data class Content(
-        val orderBook: OrderBook,
+    data class OrderBookData(
+        val orderBook: OrderBookEvent.OrderBook,
         val currentPrice: Double?,
         val signedChangeRate: Double?,
     )
@@ -17,13 +19,12 @@ sealed interface OrderBookContract {
     enum class UiStatus {
         IDLE,
         INITIAL_LOADING,
-        SOCKET_ERROR,
-        OFFLINE,
+        SOCKET_ERROR
     }
 
     data class UiState(
-        val meta: Meta,
-        val content: Content?,
+        val marketInfo: MarketInfo,
+        val orderBookData: OrderBookData?,
         val uiStatus: UiStatus,
     ) : OrderBookContract
 }

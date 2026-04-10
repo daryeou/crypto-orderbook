@@ -1,22 +1,19 @@
 package com.kwakwonjo.cryptoorderbook.feature.market
 
 import app.cash.turbine.test
+import com.kwakwonjo.cryptoorderbook.core.domain.model.Market
+import com.kwakwonjo.cryptoorderbook.core.domain.model.Ticker
 import com.kwakwonjo.cryptoorderbook.core.domain.repository.MarketRepository
 import com.kwakwonjo.cryptoorderbook.core.domain.repository.NetworkStatusRepository
+import com.kwakwonjo.cryptoorderbook.core.domain.usecase.GetMarketListUseCase
+import com.kwakwonjo.cryptoorderbook.core.domain.usecase.GetTickerListUseCase
 import com.kwakwonjo.cryptoorderbook.core.domain.usecase.IsNetworkAvailableUseCase
 import com.kwakwonjo.cryptoorderbook.core.domain.usecase.ObserveConnectivityUseCase
-import com.kwakwonjo.cryptoorderbook.core.domain.usecase.ObserveMarketSummariesUseCase
 import com.kwakwonjo.cryptoorderbook.core.model.NetworkAvailability
-import com.kwakwonjo.cryptoorderbook.core.model.MarketSummary
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -29,196 +26,113 @@ class MarketListViewModelTest {
     val dispatcherRule = MainDispatcherRule()
 
     @Test
-    fun `first collect emits loading then success`() = runTest {
-        // given
-        val upstream = MutableSharedFlow<List<MarketSummary>>()
-        val repository = FakeMarketRepository(
-            flowFactory = {
-                upstream
-            },
-        )
-        val networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.CONNECTED)
+    fun `offline initial state keeps loading without starting market requests`() = runTest {
+        val repository = FakeMarketRepository()
         val viewModel = createViewModel(
             repository = repository,
-            networkStatusRepository = networkStatusRepository,
+            networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.DISCONNECTED),
         )
 
-        assertEquals(0, repository.observeCalls)
-
         viewModel.uiState.test {
-            // when
-            assertEquals(MarketListContract.UiState.Loading, awaitItem())
-
-            val markets = listOf(
-                MarketSummary(
-                    market = "KRW-BTC",
-                    koreanName = "비트코인",
-                    englishName = "Bitcoin",
-                    tradePrice = 100.0,
-                    signedChangeRate = 0.01,
-                )
-            )
-            upstream.emit(markets)
-
-            // then
             assertEquals(
-                MarketListContract.UiState.Success(markets),
+                MarketListContract.UiState(
+                    items = emptyList(),
+                    uiStatus = MarketListContract.UiStatus.INITIAL_LOADING,
+                ),
                 awaitItem(),
             )
-            assertEquals(1, repository.observeCalls)
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
 
-    @Test
-    fun `offline state keeps loading without starting polling`() = runTest {
-        // given
-        val repository = FakeMarketRepository(
-            flowFactory = {
-                error("Polling should not start while offline.")
-            },
-        )
-        val networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.DISCONNECTED)
-        val viewModel = createViewModel(
-            repository = repository,
-            networkStatusRepository = networkStatusRepository,
-        )
-
-        viewModel.uiState.test {
-            // when
-            assertEquals(MarketListContract.UiState.Loading, awaitItem())
-
-            // then
+            assertEquals(0, repository.fetchMarketListCalls)
+            assertEquals(emptyList<List<String>>(), repository.fetchTickerListRequests)
             expectNoEvents()
-            assertEquals(0, repository.observeCalls)
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `online polling failure exposes error state`() = runTest {
-        // given
-        val failGate = CompletableDeferred<Unit>()
-        val networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.CONNECTED)
-        val viewModel = createViewModel(
-            repository = FakeMarketRepository(
-                flowFactory = {
-                    flow {
-                        failGate.await()
-                        throw IllegalStateException("boom")
-                    }
-                },
-            ),
-            networkStatusRepository = networkStatusRepository,
-        )
-
-        viewModel.uiState.test {
-            // when
-            assertEquals(MarketListContract.UiState.Loading, awaitItem())
-
-            failGate.complete(Unit)
-
-            // then
-            assertEquals(
-                MarketListContract.UiState.Error,
-                awaitItem(),
-            )
-            cancelAndIgnoreRemainingEvents()
+    fun `online ticker failure exposes error state`() = runTest {
+        val repository = FakeMarketRepository().apply {
+            enqueueMarketListSuccess(listOf(market("KRW-BTC")))
+            enqueueTickerListFailure(IllegalStateException("boom"))
         }
-    }
-
-    @Test
-    fun `retry after error restarts polling and emits loading again`() = runTest {
-        // given
-        val secondUpstream = MutableSharedFlow<List<MarketSummary>>()
-        val failGate = CompletableDeferred<Unit>()
-        val repository = FakeMarketRepository(
-            flowFactory = { invocation ->
-                when (invocation) {
-                    1 -> flow {
-                        failGate.await()
-                        throw IllegalStateException("boom")
-                    }
-
-                    else -> secondUpstream
-                }
-            },
-        )
-        val networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.CONNECTED)
         val viewModel = createViewModel(
             repository = repository,
-            networkStatusRepository = networkStatusRepository,
-        )
-        val markets = listOf(
-            MarketSummary(
-                market = "KRW-BTC",
-                koreanName = "Bitcoin",
-                englishName = "Bitcoin",
-                tradePrice = 100.0,
-                signedChangeRate = 0.01,
-            )
+            networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.CONNECTED),
         )
 
         viewModel.uiState.test {
-            // when
-            assertEquals(MarketListContract.UiState.Loading, awaitItem())
+            assertEquals(
+                MarketListContract.UiState(
+                    items = emptyList(),
+                    uiStatus = MarketListContract.UiStatus.ERROR,
+                ),
+                awaitItem(),
+            )
 
-            failGate.complete(Unit)
-            assertEquals(MarketListContract.UiState.Error, awaitItem())
+            assertEquals(1, repository.fetchMarketListCalls)
+            assertEquals(listOf(listOf("KRW-BTC")), repository.fetchTickerListRequests)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `retry after error restarts market loading and emits success`() = runTest {
+        val markets = listOf(market("KRW-BTC", "Bitcoin KRW", "Bitcoin"))
+        val tickers = listOf(ticker("KRW-BTC", tradePrice = 148_956_000.0, signedChangeRate = 0.0031))
+        val repository = FakeMarketRepository().apply {
+            enqueueMarketListSuccess(markets)
+            enqueueTickerListFailure(IllegalStateException("boom"))
+            enqueueMarketListSuccess(markets)
+            enqueueTickerListSuccess(tickers)
+        }
+        val viewModel = createViewModel(
+            repository = repository,
+            networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.CONNECTED),
+        )
+
+        viewModel.uiState.test {
+            assertEquals(
+                MarketListContract.UiState(
+                    items = emptyList(),
+                    uiStatus = MarketListContract.UiStatus.ERROR,
+                ),
+                awaitItem(),
+            )
 
             viewModel.retry()
-            advanceUntilIdle()
-            assertEquals(MarketListContract.UiState.Loading, awaitItem())
+            runCurrent()
 
-            secondUpstream.emit(markets)
-
-            // then
-            assertEquals(MarketListContract.UiState.Success(markets), awaitItem())
-            assertEquals(2, repository.observeCalls)
+            assertEquals(
+                MarketListContract.UiState(
+                    items = listOf(marketItem(markets[0], tickers[0])),
+                    uiStatus = MarketListContract.UiStatus.IDLE,
+                ),
+                awaitItem(),
+            )
+            assertEquals(2, repository.fetchMarketListCalls)
+            assertEquals(
+                listOf(
+                    listOf("KRW-BTC"),
+                    listOf("KRW-BTC"),
+                ),
+                repository.fetchTickerListRequests,
+            )
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `disconnect keeps last success and reconnect automatically restarts polling`() = runTest {
-        // given
-        var cancellationCount = 0
-        val firstUpstream = MutableSharedFlow<List<MarketSummary>>()
-        val secondUpstream = MutableSharedFlow<List<MarketSummary>>()
-        val firstMarkets = listOf(
-            MarketSummary(
-                market = "KRW-BTC",
-                koreanName = "Bitcoin",
-                englishName = "Bitcoin",
-                tradePrice = 100.0,
-                signedChangeRate = 0.01,
-            )
-        )
-        val secondMarkets = listOf(
-            MarketSummary(
-                market = "KRW-ETH",
-                koreanName = "Ethereum",
-                englishName = "Ethereum",
-                tradePrice = 200.0,
-                signedChangeRate = -0.02,
-            )
-        )
-        val repository = FakeMarketRepository(
-            flowFactory = { invocation ->
-                when (invocation) {
-                    1 -> flow {
-                        try {
-                            emitAll(firstUpstream)
-                            awaitCancellation()
-                        } finally {
-                            cancellationCount += 1
-                        }
-                    }
-
-                    else -> secondUpstream
-                }
-            },
-        )
+    fun `reconnect automatically reloads market data after disconnect`() = runTest {
+        val firstMarkets = listOf(market("KRW-BTC", "Bitcoin KRW", "Bitcoin"))
+        val firstTickers = listOf(ticker("KRW-BTC", tradePrice = 148_956_000.0, signedChangeRate = 0.0031))
+        val secondMarkets = listOf(market("KRW-ETH", "Ethereum KRW", "Ethereum"))
+        val secondTickers = listOf(ticker("KRW-ETH", tradePrice = 5_486_000.0, signedChangeRate = -0.0124))
+        val repository = FakeMarketRepository().apply {
+            enqueueMarketListSuccess(firstMarkets)
+            enqueueTickerListSuccess(firstTickers)
+            enqueueMarketListSuccess(secondMarkets)
+            enqueueTickerListSuccess(secondTickers)
+        }
         val networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.CONNECTED)
         val viewModel = createViewModel(
             repository = repository,
@@ -226,27 +140,74 @@ class MarketListViewModelTest {
         )
 
         viewModel.uiState.test {
-            // when
-            assertEquals(MarketListContract.UiState.Loading, awaitItem())
-
-            firstUpstream.emit(firstMarkets)
-            assertEquals(MarketListContract.UiState.Success(firstMarkets), awaitItem())
+            assertEquals(
+                MarketListContract.UiState(
+                    items = listOf(marketItem(firstMarkets[0], firstTickers[0])),
+                    uiStatus = MarketListContract.UiStatus.IDLE,
+                ),
+                awaitItem(),
+            )
 
             networkStatusRepository.setStatus(NetworkAvailability.DISCONNECTED)
-            advanceUntilIdle()
-
-            assertEquals(1, cancellationCount)
+            runCurrent()
             expectNoEvents()
 
             networkStatusRepository.setStatus(NetworkAvailability.CONNECTED)
-            advanceUntilIdle()
+            runCurrent()
 
-            assertEquals(2, repository.observeCalls)
+            assertEquals(
+                MarketListContract.UiState(
+                    items = listOf(marketItem(secondMarkets[0], secondTickers[0])),
+                    uiStatus = MarketListContract.UiStatus.IDLE,
+                ),
+                awaitItem(),
+            )
+            assertEquals(2, repository.fetchMarketListCalls)
+            assertEquals(
+                listOf(
+                    listOf("KRW-BTC"),
+                    listOf("KRW-ETH"),
+                ),
+                repository.fetchTickerListRequests,
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 
-            secondUpstream.emit(secondMarkets)
+    @Test
+    fun `success state keeps all supported market types`() = runTest {
+        val markets = listOf(
+            market("KRW-BTC", "Bitcoin KRW", "Bitcoin"),
+            market("BTC-ETH", "Ethereum BTC", "Ethereum"),
+            market("USDT-XRP", "XRP USDT", "XRP"),
+        )
+        val tickers = listOf(
+            ticker("KRW-BTC", tradePrice = 148_956_000.0, signedChangeRate = 0.0031),
+            ticker("BTC-ETH", tradePrice = 0.0345, signedChangeRate = -0.0124),
+            ticker("USDT-XRP", tradePrice = 1.95, signedChangeRate = 0.021),
+        )
+        val repository = FakeMarketRepository().apply {
+            enqueueMarketListSuccess(markets)
+            enqueueTickerListSuccess(tickers)
+        }
+        val viewModel = createViewModel(
+            repository = repository,
+            networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.CONNECTED),
+        )
 
-            // then
-            assertEquals(MarketListContract.UiState.Success(secondMarkets), awaitItem())
+        viewModel.uiState.test {
+            assertEquals(
+                MarketListContract.UiState(
+                    items = listOf(
+                        marketItem(markets[0], tickers[0]),
+                        marketItem(markets[1], tickers[1]),
+                        marketItem(markets[2], tickers[2]),
+                    ),
+                    uiStatus = MarketListContract.UiStatus.IDLE,
+                ),
+                awaitItem(),
+            )
+
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -255,20 +216,99 @@ class MarketListViewModelTest {
         repository: MarketRepository,
         networkStatusRepository: FakeNetworkStatusRepository,
     ): MarketListViewModel = MarketListViewModel(
-        observeMarketSummariesUseCase = ObserveMarketSummariesUseCase(repository),
+        getMarketListUseCase = GetMarketListUseCase(repository),
+        getTickerListUseCase = GetTickerListUseCase(repository),
         observeConnectivityUseCase = ObserveConnectivityUseCase(networkStatusRepository),
         isNetworkAvailableUseCase = IsNetworkAvailableUseCase(networkStatusRepository),
     )
 
-    private class FakeMarketRepository(
-        private val flowFactory: (invocation: Int) -> Flow<List<MarketSummary>>,
-    ) : MarketRepository {
-        var observeCalls: Int = 0
+    private fun market(
+        market: String,
+        koreanName: String = market,
+        englishName: String = market,
+    ): Market = Market(
+        market = market,
+        koreanName = koreanName,
+        englishName = englishName,
+    )
+
+    private fun ticker(
+        market: String,
+        tradePrice: Double,
+        signedChangeRate: Double,
+    ): Ticker = Ticker(
+        market = market,
+        tradePrice = tradePrice,
+        signedChangeRate = signedChangeRate,
+    )
+
+    private fun marketItem(
+        market: Market,
+        ticker: Ticker,
+    ): MarketListContract.MarketItem = MarketListContract.MarketItem(
+        market = market.market,
+        marketType = market.marketType,
+        koreanName = market.koreanName,
+        englishName = market.englishName,
+        tradePrice = ticker.tradePrice,
+        signedChangeRate = ticker.signedChangeRate,
+    )
+
+    private sealed interface MarketListResult {
+        data class Success(
+            val markets: List<Market>,
+        ) : MarketListResult
+
+        data class Failure(
+            val throwable: Throwable,
+        ) : MarketListResult
+    }
+
+    private sealed interface TickerListResult {
+        data class Success(
+            val tickers: List<Ticker>,
+        ) : TickerListResult
+
+        data class Failure(
+            val throwable: Throwable,
+        ) : TickerListResult
+    }
+
+    private class FakeMarketRepository : MarketRepository {
+        private val marketListResults = ArrayDeque<MarketListResult>()
+        private val tickerListResults = ArrayDeque<TickerListResult>()
+
+        var fetchMarketListCalls: Int = 0
             private set
 
-        override fun observeMarketSummaries(pollingIntervalMillis: Long): Flow<List<MarketSummary>> {
-            observeCalls += 1
-            return flowFactory(observeCalls)
+        val fetchTickerListRequests = mutableListOf<List<String>>()
+
+        override suspend fun fetchMarketList(): List<Market> {
+            fetchMarketListCalls += 1
+            return when (val result = marketListResults.removeFirst()) {
+                is MarketListResult.Success -> result.markets
+                is MarketListResult.Failure -> throw result.throwable
+            }
+        }
+
+        override suspend fun fetchTickerList(markets: List<String>): List<Ticker> {
+            fetchTickerListRequests += markets
+            return when (val result = tickerListResults.removeFirst()) {
+                is TickerListResult.Success -> result.tickers
+                is TickerListResult.Failure -> throw result.throwable
+            }
+        }
+
+        fun enqueueMarketListSuccess(markets: List<Market>) {
+            marketListResults.addLast(MarketListResult.Success(markets))
+        }
+
+        fun enqueueTickerListSuccess(tickers: List<Ticker>) {
+            tickerListResults.addLast(TickerListResult.Success(tickers))
+        }
+
+        fun enqueueTickerListFailure(throwable: Throwable) {
+            tickerListResults.addLast(TickerListResult.Failure(throwable))
         }
     }
 

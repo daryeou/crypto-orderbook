@@ -39,11 +39,12 @@ fun CryptoOrderBookNavHost(
         entryProvider = entryProvider {
             entry<AppDestination.MarketList> {
                 MarketListRoute(
-                    onMarketClick = { market, marketLabel ->
+                    onMarketClick = { market, marketType, koreanName ->
                         backStack.add(
                             OrderBookNavKey(
                                 market = market,
-                                label = marketLabel,
+                                marketType = marketType,
+                                koreanName = koreanName,
                             )
                         )
                     }

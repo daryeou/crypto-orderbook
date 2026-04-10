@@ -1,54 +1,28 @@
 ﻿package com.kwakwonjo.cryptoorderbook.core.data.repository
 
+import com.kwakwonjo.cryptoorderbook.core.data.mapper.toDomain
 import com.kwakwonjo.cryptoorderbook.core.domain.repository.MarketRepository
-import com.kwakwonjo.cryptoorderbook.core.model.MarketSummary
+import com.kwakwonjo.cryptoorderbook.core.domain.model.Market
+import com.kwakwonjo.cryptoorderbook.core.domain.model.Ticker
 import com.kwakwonjo.cryptoorderbook.core.network.api.UpbitApi
 import javax.inject.Inject
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.isActive
 
 class MarketRepositoryImpl @Inject constructor(
     private val upbitApi: UpbitApi,
 ) : MarketRepository {
 
-    override fun observeMarketSummaries(
-        pollingIntervalMillis: Long,
-    ): Flow<List<MarketSummary>> = flow {
-        while (currentCoroutineContext().isActive) {
-            emit(fetchMarketSummaries())
-            delay(pollingIntervalMillis)
+    override suspend fun fetchMarketList(): List<Market> {
+        return upbitApi.getMarkets().map {
+            it.toDomain()
         }
     }
 
-    private suspend fun fetchMarketSummaries(): List<MarketSummary> {
-        val krwMarkets = upbitApi.getMarkets()
-            .filter { it.market.startsWith(KRW_MARKET_PREFIX) }
-
-        if (krwMarkets.isEmpty()) {
-            return emptyList()
+    override suspend fun fetchTickerList(markets: List<String>): List<Ticker> {
+        return upbitApi.getTickers(
+            markets = markets.joinToString(",") { it },
+        ).map {
+            it.toDomain()
         }
-
-        val tickersByMarket = upbitApi.getTickers(
-            markets = krwMarkets.joinToString(",") { it.market },
-        ).associateBy { it.market }
-
-        return krwMarkets.mapNotNull { market ->
-            val ticker = tickersByMarket[market.market] ?: return@mapNotNull null
-            MarketSummary(
-                market = market.market,
-                koreanName = market.koreanName,
-                englishName = market.englishName,
-                tradePrice = ticker.tradePrice,
-                signedChangeRate = ticker.signedChangeRate,
-            )
-        }
-    }
-
-    private companion object {
-        const val KRW_MARKET_PREFIX = "KRW-"
     }
 }
 

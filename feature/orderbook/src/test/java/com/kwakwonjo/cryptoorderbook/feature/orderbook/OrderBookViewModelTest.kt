@@ -1,17 +1,18 @@
 package com.kwakwonjo.cryptoorderbook.feature.orderbook
 
 import app.cash.turbine.test
+import com.kwakwonjo.cryptoorderbook.core.domain.model.OrderBookEvent
+import com.kwakwonjo.cryptoorderbook.core.domain.model.OrderBookEvent.OrderBook
+import com.kwakwonjo.cryptoorderbook.core.domain.model.OrderBookEvent.OrderBook.OrderBookUnit
+import com.kwakwonjo.cryptoorderbook.core.domain.model.OrderBookEvent.TickerSnapshot
 import com.kwakwonjo.cryptoorderbook.core.domain.repository.NetworkStatusRepository
 import com.kwakwonjo.cryptoorderbook.core.domain.repository.OrderBookRepository
 import com.kwakwonjo.cryptoorderbook.core.domain.usecase.IsNetworkAvailableUseCase
 import com.kwakwonjo.cryptoorderbook.core.domain.usecase.ObserveConnectivityUseCase
 import com.kwakwonjo.cryptoorderbook.core.domain.usecase.ObserveOrderBookUseCase
 import com.kwakwonjo.cryptoorderbook.core.model.ConnectionState
+import com.kwakwonjo.cryptoorderbook.core.model.MarketType
 import com.kwakwonjo.cryptoorderbook.core.model.NetworkAvailability
-import com.kwakwonjo.cryptoorderbook.core.model.OrderBook
-import com.kwakwonjo.cryptoorderbook.core.model.OrderBookPayload
-import com.kwakwonjo.cryptoorderbook.core.model.OrderBookUnit
-import com.kwakwonjo.cryptoorderbook.core.model.TickerSnapshot
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -31,7 +32,7 @@ class OrderBookViewModelTest {
     @Test
     fun `first collect emits loading then updates accumulated content`() = runTest {
         // given
-        val upstream = MutableSharedFlow<OrderBookPayload>()
+        val upstream = MutableSharedFlow<OrderBookEvent>()
         val repository = FakeOrderBookRepository(upstream)
         val networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.CONNECTED)
         val viewModel = createViewModel(
@@ -44,7 +45,7 @@ class OrderBookViewModelTest {
             assertEquals(sampleLoadingState(), awaitItem())
 
             upstream.emit(
-                OrderBookPayload(
+                OrderBookEvent(
                     connectionState = ConnectionState.Connected,
                     orderBook = sampleOrderBook,
                 )
@@ -53,7 +54,7 @@ class OrderBookViewModelTest {
             // then
             assertEquals(
                 sampleLoadingState().copy(
-                    content = OrderBookContract.Content(
+                    orderBookData = OrderBookContract.OrderBookData(
                         orderBook = sampleOrderBook,
                         currentPrice = null,
                         signedChangeRate = null,
@@ -64,7 +65,7 @@ class OrderBookViewModelTest {
             )
 
             upstream.emit(
-                OrderBookPayload(
+                OrderBookEvent(
                     connectionState = ConnectionState.Connected,
                     orderBook = sampleOrderBook,
                     ticker = sampleTicker,
@@ -73,7 +74,7 @@ class OrderBookViewModelTest {
 
             assertEquals(
                 sampleLoadingState().copy(
-                    content = OrderBookContract.Content(
+                    orderBookData = OrderBookContract.OrderBookData(
                         orderBook = sampleOrderBook,
                         currentPrice = sampleTicker.tradePrice,
                         signedChangeRate = sampleTicker.signedChangeRate,
@@ -89,9 +90,9 @@ class OrderBookViewModelTest {
     }
 
     @Test
-    fun `offline state skips websocket subscription and keeps offline ui`() = runTest {
+    fun `offline initial state does not start websocket subscription`() = runTest {
         // given
-        val upstream = MutableSharedFlow<OrderBookPayload>()
+        val upstream = MutableSharedFlow<OrderBookEvent>()
         val repository = FakeOrderBookRepository(upstream)
         val networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.DISCONNECTED)
         val viewModel = createViewModel(
@@ -104,12 +105,7 @@ class OrderBookViewModelTest {
             val initialState = awaitItem()
 
             // then
-            assertEquals(
-                sampleLoadingState().copy(
-                    uiStatus = OrderBookContract.UiStatus.OFFLINE,
-                ),
-                initialState,
-            )
+            assertEquals(sampleLoadingState(), initialState)
             assertEquals(0, repository.observeCalls)
             expectNoEvents()
             cancelAndIgnoreRemainingEvents()
@@ -119,7 +115,7 @@ class OrderBookViewModelTest {
     @Test
     fun `online socket failure keeps content and shows retry state`() = runTest {
         // given
-        val upstream = MutableSharedFlow<OrderBookPayload>()
+        val upstream = MutableSharedFlow<OrderBookEvent>()
         val repository = FakeOrderBookRepository(upstream)
         val networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.CONNECTED)
         val viewModel = createViewModel(
@@ -132,7 +128,7 @@ class OrderBookViewModelTest {
             assertEquals(sampleLoadingState(), awaitItem())
 
             upstream.emit(
-                OrderBookPayload(
+                OrderBookEvent(
                     connectionState = ConnectionState.Connected,
                     orderBook = sampleOrderBook,
                     ticker = sampleTicker,
@@ -143,7 +139,7 @@ class OrderBookViewModelTest {
 
             // when
             upstream.emit(
-                OrderBookPayload(
+                OrderBookEvent(
                     connectionState = ConnectionState.Error,
                     errorMessage = "boom",
                 )
@@ -163,8 +159,8 @@ class OrderBookViewModelTest {
     @Test
     fun `retry starts new collection without dropping previous content`() = runTest {
         // given
-        val firstUpstream = MutableSharedFlow<OrderBookPayload>()
-        val secondUpstream = MutableSharedFlow<OrderBookPayload>()
+        val firstUpstream = MutableSharedFlow<OrderBookEvent>()
+        val secondUpstream = MutableSharedFlow<OrderBookEvent>()
         val repository = FakeOrderBookRepository(firstUpstream, secondUpstream)
         val networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.CONNECTED)
         val viewModel = createViewModel(
@@ -177,7 +173,7 @@ class OrderBookViewModelTest {
             assertEquals(sampleLoadingState(), awaitItem())
 
             firstUpstream.emit(
-                OrderBookPayload(
+                OrderBookEvent(
                     connectionState = ConnectionState.Connected,
                     orderBook = sampleOrderBook,
                     ticker = sampleTicker,
@@ -194,7 +190,7 @@ class OrderBookViewModelTest {
             assertEquals(2, repository.observeCalls)
 
             secondUpstream.emit(
-                OrderBookPayload(
+                OrderBookEvent(
                     connectionState = ConnectionState.Connecting,
                 )
             )
@@ -202,7 +198,7 @@ class OrderBookViewModelTest {
             expectNoEvents()
 
             secondUpstream.emit(
-                OrderBookPayload(
+                OrderBookEvent(
                     connectionState = ConnectionState.Connected,
                     orderBook = updatedOrderBook,
                     ticker = updatedTicker,
@@ -211,7 +207,7 @@ class OrderBookViewModelTest {
 
             assertEquals(
                 sampleSuccessState().copy(
-                    content = OrderBookContract.Content(
+                    orderBookData = OrderBookContract.OrderBookData(
                         orderBook = updatedOrderBook,
                         currentPrice = updatedTicker.tradePrice,
                         signedChangeRate = updatedTicker.signedChangeRate,
@@ -224,9 +220,9 @@ class OrderBookViewModelTest {
     }
 
     @Test
-    fun `disconnect marks offline and reconnect alone does not start new subscription`() = runTest {
+    fun `disconnect keeps previous content and reconnect starts a new subscription`() = runTest {
         // given
-        val upstream = MutableSharedFlow<OrderBookPayload>()
+        val upstream = MutableSharedFlow<OrderBookEvent>()
         val repository = FakeOrderBookRepository(upstream)
         val networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.CONNECTED)
         val viewModel = createViewModel(
@@ -239,7 +235,7 @@ class OrderBookViewModelTest {
             assertEquals(sampleLoadingState(), awaitItem())
 
             upstream.emit(
-                OrderBookPayload(
+                OrderBookEvent(
                     connectionState = ConnectionState.Connected,
                     orderBook = sampleOrderBook,
                     ticker = sampleTicker,
@@ -253,17 +249,12 @@ class OrderBookViewModelTest {
             advanceUntilIdle()
 
             // then
-            assertEquals(
-                sampleSuccessState().copy(
-                    uiStatus = OrderBookContract.UiStatus.OFFLINE,
-                ),
-                awaitItem(),
-            )
+            expectNoEvents()
 
             networkStatusRepository.setStatus(NetworkAvailability.CONNECTED)
             advanceUntilIdle()
 
-            assertEquals(1, repository.observeCalls)
+            assertEquals(2, repository.observeCalls)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -284,12 +275,12 @@ class OrderBookViewModelTest {
     )
 
     private class FakeOrderBookRepository(
-        private vararg val upstreams: MutableSharedFlow<OrderBookPayload>,
+        private vararg val upstreams: MutableSharedFlow<OrderBookEvent>,
     ) : OrderBookRepository {
         var observeCalls: Int = 0
             private set
 
-        override fun observeOrderBook(market: String): Flow<OrderBookPayload> {
+        override fun observeOrderBook(market: String): Flow<OrderBookEvent> {
             observeCalls += 1
             return upstreams.getOrElse(observeCalls - 1) { upstreams.last() }
         }
@@ -310,16 +301,17 @@ class OrderBookViewModelTest {
     }
 
     private fun sampleLoadingState() = OrderBookContract.UiState(
-        meta = OrderBookContract.Meta(
+        marketInfo = OrderBookContract.MarketInfo(
             market = sampleNavKey.market,
-            marketLabel = sampleNavKey.label,
+            marketType = sampleNavKey.marketType,
+            koreanName = sampleNavKey.koreanName,
         ),
-        content = null,
+        orderBookData = null,
         uiStatus = OrderBookContract.UiStatus.INITIAL_LOADING,
     )
 
     private fun sampleSuccessState() = sampleLoadingState().copy(
-        content = OrderBookContract.Content(
+        orderBookData = OrderBookContract.OrderBookData(
             orderBook = sampleOrderBook,
             currentPrice = sampleTicker.tradePrice,
             signedChangeRate = sampleTicker.signedChangeRate,
@@ -330,7 +322,8 @@ class OrderBookViewModelTest {
     private companion object {
         val sampleNavKey = OrderBookNavKey(
             market = "KRW-BTC",
-            label = "Bitcoin (KRW-BTC)",
+            marketType = MarketType.KRW,
+            koreanName = "Bitcoin (KRW-BTC)",
         )
 
         val sampleOrderBook = OrderBook(

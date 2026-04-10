@@ -7,7 +7,7 @@ import com.kwakwonjo.cryptoorderbook.core.domain.usecase.ObserveConnectivityUseC
 import com.kwakwonjo.cryptoorderbook.core.domain.usecase.ObserveOrderBookUseCase
 import com.kwakwonjo.cryptoorderbook.core.model.ConnectionState
 import com.kwakwonjo.cryptoorderbook.core.model.NetworkAvailability
-import com.kwakwonjo.cryptoorderbook.core.model.OrderBookPayload
+import com.kwakwonjo.cryptoorderbook.core.domain.model.OrderBookEvent
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
@@ -33,16 +34,11 @@ class OrderBookViewModel @AssistedInject constructor(
     observeConnectivityUseCase: ObserveConnectivityUseCase,
     @Assisted private val navKey: OrderBookNavKey,
 ) : ViewModel() {
-    private val meta = OrderBookContract.Meta(
+    private val marketInfo = OrderBookContract.MarketInfo(
         market = navKey.market,
-        marketLabel = navKey.label,
+        marketType = navKey.marketType,
+        koreanName = navKey.koreanName,
     )
-
-    private val initialNetworkAvailability = if (isNetworkAvailableUseCase()) {
-        NetworkAvailability.CONNECTED
-    } else {
-        NetworkAvailability.DISCONNECTED
-    }
 
     private val refreshTrigger = MutableSharedFlow<Unit>(
         extraBufferCapacity = 1,
@@ -52,35 +48,41 @@ class OrderBookViewModel @AssistedInject constructor(
     private val networkAvailability: StateFlow<NetworkAvailability> = observeConnectivityUseCase()
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-            initialValue = initialNetworkAvailability,
+            started = SharingStarted.WhileSubscribed(),
+            initialValue = if (isNetworkAvailableUseCase()) {
+                NetworkAvailability.CONNECTED
+            } else {
+                NetworkAvailability.DISCONNECTED
+            },
         )
 
-    private val orderBookFlow: Flow<OrderBookPayload> = refreshTrigger
-        .onStart {
-            if (initialNetworkAvailability == NetworkAvailability.CONNECTED) {
-                emit(Unit)
+    private val orderBookFlow: Flow<OrderBookEvent> = combine(
+        refreshTrigger.onStart { emit(Unit) },
+        networkAvailability
+    ) { _, availability -> availability }
+        .flatMapLatest { availability ->
+            if (availability == NetworkAvailability.CONNECTED) {
+                observeOrderBookUseCase(navKey.market)
+            } else {
+                flowOf(OrderBookEvent(connectionState = ConnectionState.Error))
             }
         }
-        .flatMapLatest {
-            observeOrderBookUseCase(navKey.market)
-        }
-        .scan(OrderBookPayload(connectionState = ConnectionState.Connecting)) { previous, payload ->
+        .scan(OrderBookEvent(connectionState = ConnectionState.Connecting)) { previous, payload ->
             // 새로 들어온 데이터가 null이여도 이전 호가 정보 유지
-            previous.merge(payload)
+            previous.updateWith(payload)
         }
 
     val uiState: StateFlow<OrderBookContract.UiState> = combine(
         orderBookFlow,
         networkAvailability,
-    ) { payload, networkAvailability ->
+    ) { payload, availability ->
         OrderBookContract.UiState(
-            meta = meta,
-            content = payload.toContent(),
+            marketInfo = marketInfo,
+            orderBookData = payload.toContent(),
             uiStatus = when {
-                networkAvailability == NetworkAvailability.DISCONNECTED -> OrderBookContract.UiStatus.OFFLINE
-                payload.connectionState == ConnectionState.Error -> OrderBookContract.UiStatus.SOCKET_ERROR
+                payload.connectionState == ConnectionState.Error && availability == NetworkAvailability.CONNECTED-> OrderBookContract.UiStatus.SOCKET_ERROR
                 payload.orderBook == null -> OrderBookContract.UiStatus.INITIAL_LOADING
+                // 오프라인도 IDLE 상태로 유지
                 else -> OrderBookContract.UiStatus.IDLE
             },
         )
@@ -107,33 +109,29 @@ class OrderBookViewModel @AssistedInject constructor(
         fun create(navKey: OrderBookNavKey): OrderBookViewModel
     }
 
-    private fun OrderBookPayload.merge(
-        payload: OrderBookPayload,
-    ): OrderBookPayload = copy(
+    private fun OrderBookEvent.updateWith(
+        payload: OrderBookEvent,
+    ): OrderBookEvent = copy(
         connectionState = payload.connectionState,
         orderBook = payload.orderBook ?: orderBook,
         ticker = payload.ticker ?: ticker,
         errorMessage = payload.errorMessage,
     )
 
-    private fun OrderBookPayload.toContent(): OrderBookContract.Content? {
+    private fun OrderBookEvent.toContent(): OrderBookContract.OrderBookData? {
         val currentOrderBook = orderBook ?: return null
 
-        return OrderBookContract.Content(
+        return OrderBookContract.OrderBookData(
             orderBook = currentOrderBook,
             currentPrice = ticker?.tradePrice,
             signedChangeRate = ticker?.signedChangeRate,
         )
     }
 
-    private fun initialUiState(): OrderBookContract.UiState = OrderBookContract.UiState(
-        meta = meta,
-        content = null,
-        uiStatus = if (initialNetworkAvailability == NetworkAvailability.CONNECTED) {
-            OrderBookContract.UiStatus.INITIAL_LOADING
-        } else {
-            OrderBookContract.UiStatus.OFFLINE
-        },
+    private fun initialUiState() = OrderBookContract.UiState(
+        marketInfo = marketInfo,
+        orderBookData = null,
+        uiStatus = OrderBookContract.UiStatus.INITIAL_LOADING,
     )
 
     private companion object {

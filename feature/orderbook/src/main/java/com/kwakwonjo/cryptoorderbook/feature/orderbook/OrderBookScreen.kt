@@ -30,8 +30,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.kwakwonjo.cryptoorderbook.core.model.OrderBook
-import com.kwakwonjo.cryptoorderbook.core.model.OrderBookUnit
+import com.kwakwonjo.cryptoorderbook.core.domain.model.Market
+import com.kwakwonjo.cryptoorderbook.core.domain.model.OrderBookEvent
+import com.kwakwonjo.cryptoorderbook.core.model.MarketType
+import java.text.DecimalFormat
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -47,7 +49,7 @@ fun OrderBookScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        text = uiState.meta.marketLabel.ifBlank {
+                        text = uiState.marketInfo.koreanName.ifBlank {
                             stringResource(R.string.orderbook_title_fallback)
                         },
                         maxLines = 1,
@@ -150,17 +152,27 @@ private fun OrderBookContent(
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()),
     ) {
-        AskSection(orderBook = uiState.content?.orderBook)
-        CurrentPriceCard(
-            currentPrice = uiState.content?.currentPrice,
-            signedChangeRate = uiState.content?.signedChangeRate,
+        AskSection(
+            orderBook = uiState.orderBookData?.orderBook,
+            marketType = uiState.marketInfo.marketType,
         )
-        BidSection(orderBook = uiState.content?.orderBook)
+        CurrentPriceCard(
+            currentPrice = uiState.orderBookData?.currentPrice,
+            signedChangeRate = uiState.orderBookData?.signedChangeRate,
+            marketType = uiState.marketInfo.marketType,
+        )
+        BidSection(
+            orderBook = uiState.orderBookData?.orderBook,
+            marketType = uiState.marketInfo.marketType,
+        )
     }
 }
 
 @Composable
-private fun AskSection(orderBook: OrderBook?) {
+private fun AskSection(
+    orderBook: OrderBookEvent.OrderBook?,
+    marketType: MarketType,
+) {
     Text(
         text = stringResource(R.string.orderbook_ask_section),
         modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
@@ -183,6 +195,7 @@ private fun AskSection(orderBook: OrderBook?) {
                 label = "ASK",
                 priceColor = Color(0xFFD32F2F),
                 backgroundColor = Color(0xFFFFEBEE),
+                marketType = marketType,
             )
         }
     }
@@ -192,6 +205,7 @@ private fun AskSection(orderBook: OrderBook?) {
 private fun CurrentPriceCard(
     currentPrice: Double?,
     signedChangeRate: Double?,
+    marketType: MarketType,
 ) {
     val changeColor = if ((signedChangeRate ?: 0.0) >= 0) {
         Color(0xFFD32F2F)
@@ -215,7 +229,7 @@ private fun CurrentPriceCard(
                 style = MaterialTheme.typography.labelLarge,
             )
             Text(
-                text = currentPrice?.toWonString() ?: "--",
+                text = currentPrice?.toPriceString(marketType) ?: "--",
                 modifier = Modifier.padding(top = 6.dp),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
@@ -233,7 +247,10 @@ private fun CurrentPriceCard(
 }
 
 @Composable
-private fun BidSection(orderBook: OrderBook?) {
+private fun BidSection(
+    orderBook: OrderBookEvent.OrderBook?,
+    marketType: MarketType,
+) {
     Text(
         text = stringResource(R.string.orderbook_bid_section),
         modifier = Modifier.padding(bottom = 8.dp),
@@ -256,6 +273,7 @@ private fun BidSection(orderBook: OrderBook?) {
                 label = "BID",
                 priceColor = Color(0xFF1976D2),
                 backgroundColor = Color(0xFFE3F2FD),
+                marketType = marketType,
             )
         }
     }
@@ -292,11 +310,12 @@ private fun PlaceholderOrderBookRow() {
 
 @Composable
 private fun OrderBookRow(
-    unit: OrderBookUnit,
+    unit: OrderBookEvent.OrderBook.OrderBookUnit,
     maxSize: Double,
     label: String,
     priceColor: Color,
     backgroundColor: Color,
+    marketType: MarketType,
 ) {
     val widthFraction = (unit.size / maxSize).toFloat().coerceIn(0.15f, 1f)
 
@@ -323,7 +342,7 @@ private fun OrderBookRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = unit.price.toWonString(),
+                    text = unit.price.toPriceString(marketType),
                     color = priceColor,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
@@ -338,6 +357,11 @@ private fun OrderBookRow(
     }
 }
 
-private fun Double.toWonString(): String = NumberFormat.getNumberInstance(Locale.KOREA).format(this)
+private fun Double.toPriceString(marketType: MarketType): String = when (marketType) {
+    MarketType.KRW -> NumberFormat.getNumberInstance(Locale.KOREA).format(this)
+    else -> DECIMAL_PRICE_FORMAT.format(this)
+}
 
 private fun Double.toVolumeString(): String = String.format(Locale.KOREA, "%.4f", this)
+
+private val DECIMAL_PRICE_FORMAT = DecimalFormat("#,##0.#########")

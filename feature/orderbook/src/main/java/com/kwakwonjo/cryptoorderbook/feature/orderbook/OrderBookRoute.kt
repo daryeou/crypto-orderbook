@@ -13,22 +13,11 @@ fun OrderBookRoute(
     onBack: () -> Unit,
     viewModel: OrderBookViewModel,
 ) {
-    val uiState = viewModel.uiState.collectAsStateWithLifecycle()
-    var previousStatus by remember { mutableStateOf(uiState.value.uiStatus) }
-
-    LaunchedEffect(uiState.value.uiStatus) {
-        if (
-            previousStatus == OrderBookContract.UiStatus.OFFLINE &&
-            uiState.value.uiStatus != OrderBookContract.UiStatus.OFFLINE
-        ) {
-            viewModel.refresh()
-        }
-
-        previousStatus = uiState.value.uiStatus
-    }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var previousStatus by remember { mutableStateOf(uiState.uiStatus) }
 
     OrderBookScreen(
-        uiState = uiState.value,
+        uiState = uiState,
         onBack = onBack,
         onRetry = viewModel::retry,
     )

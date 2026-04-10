@@ -1,15 +1,25 @@
 package com.kwakwonjo.cryptoorderbook.feature.market
 
-import com.kwakwonjo.cryptoorderbook.core.model.MarketSummary
+import com.kwakwonjo.cryptoorderbook.core.model.MarketType
 
 sealed interface MarketListContract {
-    sealed interface UiState : MarketListContract {
-        data object Loading : UiState
+    data class MarketItem(
+        val market: String,
+        val marketType: MarketType,
+        val koreanName: String,
+        val englishName: String,
+        val tradePrice: Double,
+        val signedChangeRate: Double,
+    )
 
-        data object Error : UiState
-
-        data class Success(
-            val markets: List<MarketSummary>,
-        ) : UiState
+    enum class UiStatus {
+        IDLE,
+        INITIAL_LOADING,
+        ERROR
     }
+
+    data class UiState(
+        val items: List<MarketItem>,
+        val uiStatus: UiStatus
+    )
 }
