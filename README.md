@@ -66,26 +66,26 @@ app
 ### 모듈 역할
 
 - `app`: Application, Activity, Navigation3 NavHost, 전역 오프라인 UI
-- `core:model`: 순수 모델
-- `core:domain`: repository contract, use case
+- `core:model`: 공유 enum과 연결 상태 (`MarketType`, `NetworkAvailability`, `ConnectionState`)
+- `core:domain`: repository contract, use case, 거래소/호가 domain 모델 (`Market`, `Ticker`, `OrderBookEvent`)
 - `core:network`: REST / WebSocket DTO와 클라이언트
-- `core:data`: repository 구현과 Hilt binding
+- `core:data`: repository 구현, mapper, Hilt binding
 - `feature:market`: 종목 리스트 화면과 ViewModel
 - `feature:orderbook`: 호가창 화면과 ViewModel
 
 ### 상태 관리
 
 - `MarketList`는 `items + uiStatus` 형태의 `MarketListContract.UiState`를 사용하고, 탭 상태는 `TabRow + HorizontalPager`를 사용하는 화면 계층에서 관리합니다.
-- `OrderBook`는 `meta + content + uiStatus` 구조의 `OrderBookContract.UiState`를 사용합니다.
-  - `meta`: 종목 정보
-  - `content`: 현재 렌더링 가능한 호가/현재가/등락률
-  - `uiStatus`: `IDLE`, `INITIAL_LOADING`, `SOCKET_ERROR`, `OFFLINE`
+- `OrderBook`는 `marketInfo + orderBookData + uiStatus` 구조의 `OrderBookContract.UiState`를 사용합니다.
+  - `marketInfo`: 종목 코드, 마켓 타입, 한글명
+  - `orderBookData`: 현재 렌더링 가능한 호가/현재가/등락률
+  - `uiStatus`: `IDLE`, `INITIAL_LOADING`, `SOCKET_ERROR`
 - `Route`와 `Screen`을 분리합니다.
   - `Route`: Hilt 주입, 상태 수집, 액션 전달
   - `Screen`: 순수 UI 렌더링
-- `MarketListViewModel`과 `OrderBookViewModel`은 `SharedFlow<Unit> + flatMapLatest + stateIn(WhileSubscribed)` 패턴으로 새로고침과 수집 생명주기를 관리합니다.
-- `ObserveMarketSummariesUseCase`가 polling 주기를 관리하고, `MarketRepository`는 단건 fetch만 담당합니다.
-- `OrderBookViewModel`은 repository가 누적해 전달한 `OrderBookPayload`와 `NetworkAvailability`를 결합해 최종 `UiState`를 만듭니다.
+- `MarketListViewModel`은 `refreshTrigger + NetworkAvailability`를 결합해 polling 시작/중단을 제어하고, `scan`으로 마지막 리스트를 유지합니다.
+- `GetMarketListUseCase`는 종목 메타데이터를 한 번 조회하고, `GetTickerListUseCase`가 polling 주기를 관리합니다.
+- `OrderBookViewModel`은 repository가 누적해 전달한 `OrderBookEvent`와 `NetworkAvailability`를 결합해 최종 `UiState`를 만듭니다.
 
 ### Navigation
 
@@ -135,11 +135,14 @@ app
 
 ```mermaid
 flowchart LR
-    A["Upbit REST<br/>market/all + ticker"] --> B["MarketRepository"]
-    B --> C["ObserveMarketSummariesUseCase"]
-    C --> D["MarketListViewModel"]
-    D --> E["MarketListContract.UiState"]
-    E --> F["MarketListScreen"]
+    A["Upbit REST: market/all"] --> B["MarketRepository"]
+    C["Upbit REST: ticker"] --> B
+    B --> D["GetMarketListUseCase"]
+    B --> E["GetTickerListUseCase"]
+    D --> F["MarketListViewModel"]
+    E --> F
+    F --> G["MarketListContract.UiState"]
+    G --> H["MarketListScreen"]
 ```
 
 ### 호가창
@@ -182,7 +185,7 @@ flowchart LR
 
 화면별 에러 정책:
 - `MarketList`: 온라인 상태에서 REST polling이 실패할 때만 `Error`
-- `OrderBook`: 온라인 상태에서 WebSocket 연결이 실패할 때만 `Error(SOCKET)`
+- `OrderBook`: 온라인 상태에서 WebSocket 연결이 실패할 때만 `SOCKET_ERROR`
 
 ## 주요 라이브러리
 
@@ -214,8 +217,8 @@ flowchart LR
 
 - `OrderBookRepositoryImplTest`: WebSocket frame 병합과 error payload 전이 검증
 - `NetworkStatusRepositoryImplTest`: connectivity flow 초기값과 전이 검증
-- `MarketListViewModelTest`: 초기 로딩, 온라인 실패, 오프라인 유지, 자동 polling 재개, retry, 전체 마켓 유지 검증
-- `OrderBookViewModelTest`: 누적 payload 기반 `UiState(meta + content + uiStatus)`, 온라인 socket 실패, 오프라인 유지, retry 검증
+- `MarketListViewModelTest`: 오프라인 초기 로딩, 온라인 실패, retry, 자동 polling 재개, 전체 마켓 유지 검증
+- `OrderBookViewModelTest`: 누적 `OrderBookEvent` 기반 `UiState(marketInfo + orderBookData + uiStatus)`, 온라인 socket 실패, retry 검증
 
 ## 검증 결과
 
