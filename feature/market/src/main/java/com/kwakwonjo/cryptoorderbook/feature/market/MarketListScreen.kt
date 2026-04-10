@@ -48,7 +48,7 @@ import com.kwakwonjo.cryptoorderbook.feature.market.component.TopBar
 import kotlinx.coroutines.launch
 
 @Composable
-fun MarketListScreen(
+internal fun MarketListScreen(
     uiState: MarketListContract.UiState,
     onMarketClick: (market: String, marketType: MarketType, koreanName: String) -> Unit,
     onRetry: () -> Unit,

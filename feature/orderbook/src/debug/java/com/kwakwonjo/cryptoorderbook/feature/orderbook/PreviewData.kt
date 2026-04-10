@@ -30,6 +30,6 @@ internal object PreviewData {
             currentPrice = 148_956_000.0,
             signedChangeRate = 0.0031,
         ),
-        uiStatus = OrderBookContract.UiStatus.IDLE,
+        uiStatus = OrderBookContract.UiStatus.Idle,
     )
 }

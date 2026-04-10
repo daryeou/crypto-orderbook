@@ -57,6 +57,7 @@ Windows에서는 `gradlew.bat`를 사용합니다.
 ```text
 app
   -> core:designsystem
+  -> core:ui
   -> feature:market / feature:orderbook
        -> core:domain
             -> core:data
@@ -68,6 +69,7 @@ app
 
 - `app`: Application, Activity, Navigation3 NavHost, 전역 오프라인 UI
 - `core:designsystem`: Compose theme, color, typography 같은 공통 디자인 토큰
+- `core:ui`: designsystem 위에 쌓는 공통 Compose UI 모듈
 - `core:model`: 공유 enum과 연결 상태 (`MarketType`, `NetworkAvailability`, `ConnectionState`)
 - `core:domain`: repository contract, use case, 거래소/호가 domain 모델 (`Market`, `Ticker`, `OrderBookEvent`)
 - `core:network`: REST / WebSocket DTO와 클라이언트

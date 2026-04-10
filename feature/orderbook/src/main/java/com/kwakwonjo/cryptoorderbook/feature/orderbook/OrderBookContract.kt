@@ -1,11 +1,10 @@
 package com.kwakwonjo.cryptoorderbook.feature.orderbook
 
-import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import com.kwakwonjo.cryptoorderbook.core.domain.model.OrderBookEvent
 import com.kwakwonjo.cryptoorderbook.core.model.MarketType
 
-sealed interface OrderBookContract {
+internal sealed interface OrderBookContract {
     data class MarketInfo(
         val market: String,
         val marketType: MarketType,
@@ -18,10 +17,13 @@ sealed interface OrderBookContract {
         val signedChangeRate: Double?,
     )
 
-    enum class UiStatus {
-        IDLE,
-        INITIAL_LOADING,
-        SOCKET_ERROR
+    sealed interface Error
+
+    sealed interface UiStatus {
+        data object Idle: UiStatus
+        data object InitialLoading: UiStatus
+        data object SocketError: UiStatus, Error
+        data object Offline: UiStatus, Error
     }
 
     @Stable
@@ -29,5 +31,8 @@ sealed interface OrderBookContract {
         val marketInfo: MarketInfo,
         val orderBookData: OrderBookData?,
         val uiStatus: UiStatus,
-    ) : OrderBookContract
+    ) : OrderBookContract {
+        val isError: Boolean
+            get() = uiStatus is Error
+    }
 }

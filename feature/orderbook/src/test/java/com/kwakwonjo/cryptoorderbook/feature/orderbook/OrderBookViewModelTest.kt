@@ -59,7 +59,7 @@ class OrderBookViewModelTest {
                         currentPrice = null,
                         signedChangeRate = null,
                     ),
-                    uiStatus = OrderBookContract.UiStatus.IDLE,
+                    uiStatus = OrderBookContract.UiStatus.Idle,
                 ),
                 awaitItem(),
             )
@@ -79,7 +79,7 @@ class OrderBookViewModelTest {
                         currentPrice = sampleTicker.tradePrice,
                         signedChangeRate = sampleTicker.signedChangeRate,
                     ),
-                    uiStatus = OrderBookContract.UiStatus.IDLE,
+                    uiStatus = OrderBookContract.UiStatus.Idle,
                 ),
                 awaitItem(),
             )
@@ -90,7 +90,7 @@ class OrderBookViewModelTest {
     }
 
     @Test
-    fun `offline initial state does not start websocket subscription`() = runTest {
+    fun `offline initial state stays loading without starting websocket subscription`() = runTest {
         // given
         val upstream = MutableSharedFlow<OrderBookEvent>()
         val repository = FakeOrderBookRepository(upstream)
@@ -105,7 +105,10 @@ class OrderBookViewModelTest {
             val initialState = awaitItem()
 
             // then
-            assertEquals(sampleLoadingState(), initialState)
+            assertEquals(
+                sampleLoadingState(),
+                initialState,
+            )
             assertEquals(0, repository.observeCalls)
             expectNoEvents()
             cancelAndIgnoreRemainingEvents()
@@ -113,7 +116,7 @@ class OrderBookViewModelTest {
     }
 
     @Test
-    fun `online socket failure keeps content and shows retry state`() = runTest {
+    fun `online socket failure clears content and shows socket error`() = runTest {
         // given
         val upstream = MutableSharedFlow<OrderBookEvent>()
         val repository = FakeOrderBookRepository(upstream)
@@ -147,8 +150,8 @@ class OrderBookViewModelTest {
 
             // then
             assertEquals(
-                sampleSuccessState().copy(
-                    uiStatus = OrderBookContract.UiStatus.SOCKET_ERROR,
+                sampleLoadingState().copy(
+                    uiStatus = OrderBookContract.UiStatus.SocketError,
                 ),
                 awaitItem(),
             )
@@ -157,7 +160,7 @@ class OrderBookViewModelTest {
     }
 
     @Test
-    fun `retry starts new collection without dropping previous content`() = runTest {
+    fun `retry starts new collection and emits loading before next content`() = runTest {
         // given
         val firstUpstream = MutableSharedFlow<OrderBookEvent>()
         val secondUpstream = MutableSharedFlow<OrderBookEvent>()
@@ -195,7 +198,7 @@ class OrderBookViewModelTest {
                 )
             )
 
-            expectNoEvents()
+            assertEquals(sampleLoadingState(), awaitItem())
 
             secondUpstream.emit(
                 OrderBookEvent(
@@ -220,7 +223,7 @@ class OrderBookViewModelTest {
     }
 
     @Test
-    fun `disconnect keeps previous content and reconnect starts a new subscription`() = runTest {
+    fun `disconnect keeps previous content with offline state and reconnect starts a new subscription`() = runTest {
         // given
         val upstream = MutableSharedFlow<OrderBookEvent>()
         val repository = FakeOrderBookRepository(upstream)
@@ -249,12 +252,19 @@ class OrderBookViewModelTest {
             advanceUntilIdle()
 
             // then
-            expectNoEvents()
+            assertEquals(
+                sampleSuccessState().copy(
+                    uiStatus = OrderBookContract.UiStatus.Offline,
+                ),
+                awaitItem(),
+            )
 
             networkStatusRepository.setStatus(NetworkAvailability.CONNECTED)
             advanceUntilIdle()
 
             assertEquals(2, repository.observeCalls)
+            assertEquals(sampleSuccessState(), awaitItem())
+            expectNoEvents()
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -280,7 +290,7 @@ class OrderBookViewModelTest {
         var observeCalls: Int = 0
             private set
 
-        override fun observeOrderBook(market: String): Flow<OrderBookEvent> {
+        override fun observeOrderBook(market: String, orderbookUnit: Int): Flow<OrderBookEvent> {
             observeCalls += 1
             return upstreams.getOrElse(observeCalls - 1) { upstreams.last() }
         }
@@ -307,7 +317,7 @@ class OrderBookViewModelTest {
             koreanName = sampleNavKey.koreanName,
         ),
         orderBookData = null,
-        uiStatus = OrderBookContract.UiStatus.INITIAL_LOADING,
+        uiStatus = OrderBookContract.UiStatus.InitialLoading,
     )
 
     private fun sampleSuccessState() = sampleLoadingState().copy(
@@ -316,7 +326,7 @@ class OrderBookViewModelTest {
             currentPrice = sampleTicker.tradePrice,
             signedChangeRate = sampleTicker.signedChangeRate,
         ),
-        uiStatus = OrderBookContract.UiStatus.IDLE,
+        uiStatus = OrderBookContract.UiStatus.Idle,
     )
 
     private companion object {

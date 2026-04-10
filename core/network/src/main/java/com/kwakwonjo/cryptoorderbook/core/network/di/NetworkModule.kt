@@ -15,6 +15,7 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.util.concurrent.TimeUnit
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -34,6 +35,7 @@ object NetworkModule {
         }
 
         return OkHttpClient.Builder()
+            .pingInterval(30, TimeUnit.SECONDS)
             .addInterceptor(loggingInterceptor)
             .build()
     }

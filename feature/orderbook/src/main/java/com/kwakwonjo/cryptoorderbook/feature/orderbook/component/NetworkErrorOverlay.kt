@@ -27,9 +27,7 @@ import com.kwakwonjo.cryptoorderbook.core.designsystem.theme.LocalColors
 import com.kwakwonjo.cryptoorderbook.feature.orderbook.R
 
 @Composable
-internal fun BoxScope.SocketErrorOverlay(
-    onRetry: () -> Unit
-) {
+internal fun BoxScope.NetworkErrorOverlay() {
     Box(
         modifier = Modifier
             .matchParentSize()
@@ -54,26 +52,18 @@ internal fun BoxScope.SocketErrorOverlay(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = stringResource(R.string.orderbook_socket_error_title),
+                    text = stringResource(R.string.orderbook_network_error_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 VerticalSpacer(8.dp)
                 Text(
-                    text = stringResource(R.string.orderbook_socket_error_message),
+                    text = stringResource(R.string.orderbook_network_error_message),
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                VerticalSpacer(20.dp)
-                Button(
-                    onClick = onRetry,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(text = stringResource(R.string.retry_connect), fontWeight = FontWeight.Bold)
-                }
             }
         }
     }

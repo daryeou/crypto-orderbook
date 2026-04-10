@@ -84,7 +84,7 @@ class MarketListViewModel @Inject constructor(
             )
         }
 
-    val uiState: StateFlow<MarketListContract.UiState> = combine(
+    internal val uiState: StateFlow<MarketListContract.UiState> = combine(
         marketDataFlow,
         networkAvailability,
     ) { event, availability ->

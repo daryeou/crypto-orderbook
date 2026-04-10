@@ -9,10 +9,14 @@ import com.kwakwonjo.cryptoorderbook.core.network.model.UpbitSubscription
 import com.kwakwonjo.cryptoorderbook.core.network.model.UpbitTickerFrame
 import com.kwakwonjo.cryptoorderbook.core.network.model.UpbitWsFrame
 import com.kwakwonjo.cryptoorderbook.core.network.websocket.UpbitWebSocketClient
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.flow.runningFold
+import java.io.IOException
 import javax.inject.Inject
+import kotlin.compareTo
 
 class OrderBookRepositoryImpl @Inject constructor(
     private val upbitWebSocketClient: UpbitWebSocketClient,
@@ -23,7 +27,15 @@ class OrderBookRepositoryImpl @Inject constructor(
 
         return upbitWebSocketClient.observeUpbitStream(
             subscription = UpbitSubscription(market = market, orderbookUnit = orderbookUnit),
-        ).runningFold(initialPayload) { current, frame ->
+        ).retryWhen { cause, attempt ->
+            if (cause is IOException && attempt < 3) {
+                val delayTime = minOf(1000L * (attempt + 1), 10000L)
+                delay(delayTime)
+                true
+            } else {
+                false
+            }
+        }.runningFold(initialPayload) { current, frame ->
             current.reduce(frame)
         }.catch { throwable ->
             emit(

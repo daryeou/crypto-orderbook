@@ -5,7 +5,7 @@ import androidx.compose.runtime.Stable
 import com.kwakwonjo.cryptoorderbook.core.model.Market
 import com.kwakwonjo.cryptoorderbook.core.model.Ticker
 
-sealed interface MarketListContract {
+internal sealed interface MarketListContract {
 
     @Immutable
     data class MarketItem(
