@@ -33,7 +33,7 @@
 
 - 복수 거래소 지원
 - 차트, 즐겨찾기, 고급 정렬/필터
-- 완성형 재연결 백오프 정책
+- jitter를 포함한 완성형 재연결 정책
 - 오프라인 캐시와 stale 데이터 정책 고도화
 - 디자인 시스템 모듈 분리
 
@@ -148,6 +148,7 @@ feature:orderbook
 - `OrderBookViewModel`
   - 오프라인 시 `uiStatus = OFFLINE`으로만 전환하고 마지막 `content`는 유지한다.
   - 온라인 상태에서 WebSocket 실패 시에만 `uiStatus = SOCKET_ERROR`를 낸다.
+  - repository는 일시적 `IOException`에 대해 `1초 -> 2초 -> 3초` 제한적 backoff 재시도를 수행하고, 모두 실패하면 소켓 오류 상태를 노출한다. 현재 jitter는 적용하지 않는다.
   - repository가 누적한 payload와 `NetworkAvailability`를 결합해 `UiState`를 만든다.
   - 연결 복구 후 재구독은 `Route`에서 전이를 감지해 `refresh()`를 호출하는 방식으로 처리한다.
 - 수동 `retry()`는 온라인 상태의 실패 화면에서만 사용한다.
@@ -203,7 +204,7 @@ feature:orderbook
 ## 남은 이슈와 후속 과제
 
 - `MarketListViewModel`의 정렬/필터링과 탭 상태를 현재 구조에서 어떻게 확장할지 점검
-- WebSocket 자동 재연결 백오프 정책
+- WebSocket 재연결 jitter 적용 및 재시도 정책 고도화
 - `MarketList` 빈 상태 전용 UI
 - stale 데이터 유지 정책 고도화
 - 오프라인 복구 후 사용자 안내 방식 세분화
