@@ -29,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,8 +57,8 @@ internal fun MarketListScreen(
     val marketTypes = remember { MarketType.entries.filter { it.isVisible } }
     val pagerState = rememberPagerState(pageCount = { marketTypes.size })
     val coroutineScope = rememberCoroutineScope()
-    var currentSortOrder by remember { mutableStateOf(SortOrder.PRICE_DESC) }
-    var searchQuery by remember { mutableStateOf("") }
+    var currentSortOrder by rememberSaveable { mutableStateOf(SortOrder.PRICE_DESC) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
