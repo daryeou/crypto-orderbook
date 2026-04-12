@@ -21,6 +21,7 @@
 - [x] 온라인 상태에서 WebSocket 비정상 종료 시 자동 재연결(backoff / jitter)
 - [x] 연결 복구 UI/UX 세분화
 - [ ] Firebase Crashlytics를 연동해 WebSocket/REST 오류, 연결 복구 실패, 예외 스택 수집 등 운영 관측성 개선
+- [ ] 종목 리스트는 현재 1초 REST polling 기반이므로, 이후에는 Upbit ticker WebSocket 구독 또는 초기 REST 조회 + 수동 새로고침 방식으로 전환해 네트워크 비용을 줄일 계획
 
 ### 화면 상태
 - [x] 로딩 상태
