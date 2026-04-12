@@ -68,21 +68,62 @@
 ### 아키텍처
 
 - 기본 구조: `Clean Architecture + MVVM + StateFlow`
-- 의존 방향: `data -> domain -> feature ViewModel`
+- 실행 데이터 흐름: `data -> domain -> feature ViewModel`
 - 표현 계층: `Route + Screen` 분리
   - `Route`: Hilt 주입, 상태 수집, 액션 전달
   - `Screen`: 순수 UI 렌더링
 
 ### 모듈 구조
 
-```text
-app
-core:model
-core:domain
-core:network
-core:data
-feature:market
-feature:orderbook
+아래 그래프는 MVVM + Clean Architecture 기준의 모듈 계층과 주요 참조 방향을 나타낸다.
+
+```mermaid
+graph TD
+    subgraph presentation["Presentation"]
+        app["app"]
+        featureMarket["feature:market"]
+        featureOrderbook["feature:orderbook"]
+    end
+
+    subgraph uiFoundation["UI Foundation"]
+        coreUi["core:ui"]
+        coreDesignsystem["core:designsystem"]
+    end
+
+    subgraph domainLayer["Domain"]
+        coreDomain["core:domain"]
+    end
+
+    subgraph dataLayer["Data"]
+        coreData["core:data"]
+        coreNetwork["core:network"]
+    end
+
+    subgraph sharedLayer["Shared Model"]
+        coreModel["core:model"]
+    end
+
+    app --> featureMarket
+    app --> featureOrderbook
+    app --> coreDesignsystem
+
+    featureMarket --> coreDomain
+    featureMarket --> coreUi
+    featureMarket --> coreModel
+
+    featureOrderbook --> coreDomain
+    featureOrderbook --> coreUi
+    featureOrderbook --> coreModel
+
+    coreUi --> coreDesignsystem
+    coreDesignsystem --> coreModel
+
+    coreData --> coreDomain
+    coreData --> coreNetwork
+    coreData --> coreModel
+
+    coreDomain --> coreModel
+    coreNetwork --> coreModel
 ```
 
 ### 모듈 역할

@@ -113,34 +113,65 @@ Windows에서는 `gradlew.bat`를 사용합니다. 빌드 결과물은 `app/buil
 - `model` 계층은 여러 모듈에서 공통으로 쓰는 순수 모델을 담당합니다.
 - `designsystem` / `ui` 계층은 재사용 가능한 Compose 테마와 UI 조각을 담당합니다.
 
-### Module Map
+### Module Graph
 
-```text
-app
-├─ core:designsystem
-├─ feature:market
-│  ├─ core:domain
-│  ├─ core:model
-│  ├─ core:ui
-│  └─ core:designsystem
-└─ feature:orderbook
-   ├─ core:domain
-   ├─ core:model
-   ├─ core:ui
-   └─ core:designsystem
+아래 그래프는 MVVM + Clean Architecture 기준의 모듈 계층과 주요 참조 방향을 나타냅니다.
 
-core:data
-├─ core:domain
-├─ core:model
-└─ core:network
+```mermaid
+graph TD
+    subgraph presentation["Presentation"]
+        app["app"]
+        featureMarket["feature:market"]
+        featureOrderbook["feature:orderbook"]
+    end
+
+    subgraph uiFoundation["UI Foundation"]
+        coreUi["core:ui"]
+        coreDesignsystem["core:designsystem"]
+    end
+
+    subgraph domainLayer["Domain"]
+        coreDomain["core:domain"]
+    end
+
+    subgraph dataLayer["Data"]
+        coreData["core:data"]
+        coreNetwork["core:network"]
+    end
+
+    subgraph sharedLayer["Shared Model"]
+        coreModel["core:model"]
+    end
+
+    app --> featureMarket
+    app --> featureOrderbook
+    app --> coreDesignsystem
+
+    featureMarket --> coreDomain
+    featureMarket --> coreUi
+    featureMarket --> coreModel
+
+    featureOrderbook --> coreDomain
+    featureOrderbook --> coreUi
+    featureOrderbook --> coreModel
+
+    coreUi --> coreDesignsystem
+    coreDesignsystem --> coreModel
+
+    coreData --> coreDomain
+    coreData --> coreNetwork
+    coreData --> coreModel
+
+    coreDomain --> coreModel
+    coreNetwork --> coreModel
 ```
 
 ### Dependency Rules
 
-- `app`은 화면 진입점과 전역 앱 상태만 담당합니다.
-- `feature:*`는 `domain`, `model`, 공통 UI 모듈만 참조합니다.
-- `core:data`는 `domain` contract를 구현하고 `network`를 사용합니다.
-- `core:model`은 가장 아래의 공유 모델 모듈로 유지합니다.
+- `app`은 Composition Root로서 Navigation과 전역 UI만 조립합니다.
+- `feature:*`는 Presentation 계층으로 `core:domain`, `core:ui`, `core:model`만 참조합니다.
+- `core:data`는 Data 계층으로 `core:domain` contract를 구현하고 `core:network`를 사용합니다.
+- `core:model`은 모든 계층이 공유하는 가장 아래의 순수 모델 모듈로 유지합니다.
 
 ### Module Responsibilities
 
