@@ -20,7 +20,7 @@
 ## Overview
 
 ### 핵심 기능
-- REST API로 KRW / BTC / USDT 마켓 종목 리스트 조회
+- REST 초기 조회 + WebSocket 갱신으로 KRW / BTC / USDT 마켓 종목 리스트 제공
 - 현재가와 24시간 변동률 표시
 - WebSocket 기반 실시간 호가창 갱신
 - 검색 / 정렬 / 마켓 탭 전환 지원
@@ -31,7 +31,7 @@
 
 | 항목 | 구현 상태 | 비고 |
 |---|---|---|
-| 종목 리스트 | 완료 | `market/all` + `ticker` 기반 |
+| 종목 리스트 | 완료 | `market/all` + REST `ticker` 초기 조회 + WebSocket `ticker` 갱신 |
 | 호가창 | 완료 | 매수 / 매도 호가 + 현재가 표시 |
 | 실시간 갱신 | 완료 | 호가창은 WebSocket만 사용 |
 | 에러 / 로딩 / 오프라인 UI | 완료 | 전역 스낵바 + 화면별 상태 분리 |
@@ -83,7 +83,7 @@
 
 ### Quick Install
 
-- APK 다운로드: [CoinX_Debug.apk](https://github.com/daryeou/crypto-orderbook/releases/download/release/CoinX_Debug.apk)
+- APK 다운로드: [coinx_v1.1.0.apk](https://github.com/daryeou/crypto-orderbook/releases/download/v1.1.0/coinx_v1.1.0.apk)
 - Android 기기에서 설치 후 바로 실행할 수 있습니다.
 
 ### Environment
@@ -191,7 +191,7 @@ graph TD
 
 | Screen | Input | State |
 |---|---|---|
-| Market List | REST ticker polling + connectivity | `items + uiStatus` |
+| Market List | REST `ticker` 초기 조회 + WebSocket `ticker` + connectivity | `items + uiStatus` |
 | Order Book | WebSocket `orderbook` + `ticker` + connectivity | `marketInfo + orderBookData + uiStatus` |
 
 ### Data Flow
@@ -201,13 +201,14 @@ graph TD
 ```mermaid
 graph LR
     A["Upbit REST: market/all"] --> B["MarketRepository"]
-    C["Upbit REST: ticker"] --> B
-    B --> D["GetMarketListUseCase"]
-    B --> E["GetTickerListUseCase"]
-    D --> F["MarketListViewModel"]
-    E --> F
-    F --> G["MarketListContract.UiState"]
-    G --> H["MarketListScreen"]
+    C["Upbit REST: ticker (initial snapshot)"] --> B
+    D["Upbit WebSocket: ticker (realtime)"] --> B
+    B --> E["GetMarketListUseCase"]
+    B --> F["GetTickerListUseCase"]
+    E --> G["MarketListViewModel"]
+    F --> G
+    G --> H["MarketListContract.UiState"]
+    H --> I["MarketListScreen"]
 ```
 
 #### Order Book
@@ -224,7 +225,7 @@ graph LR
 
 ### UI / Error Policy
 
-- `MarketList`는 온라인 상태의 REST polling 실패를 `ERROR`로 처리합니다.
+- `MarketList`는 오프라인 상태를 `OFFLINE`, 초기 시세 조회 또는 실시간 ticker 연결 실패를 `ERROR`로 분리합니다.
 - `OrderBook`는 `InitialLoading`, `SocketError`, `Offline`, `Idle` 상태를 분리합니다.
 - 앱 루트에서는 네트워크 단절 시 전역 스낵바를 1회 노출합니다.
 - 호가창 화면은 오프라인과 소켓 오류를 서로 다른 오버레이로 표현합니다.
@@ -270,7 +271,7 @@ graph LR
 | Retrofit | REST API | Upbit REST API인 `market/all`, `ticker` 호출을 명확한 인터페이스로 구성하기 좋았고, DTO와 mapper를 분리한 data 계층 구조와도 잘 맞았습니다 |
 | OkHttp WebSocket | 실시간 스트림 | Retrofit과 같은 네트워크 스택을 유지하면서 WebSocket을 직접 제어할 수 있어, 실시간 호가/현재가 스트림과 재연결 처리를 일관되게 구현하기 좋았습니다 |
 | kotlinx.serialization | JSON 직렬화 | REST와 WebSocket DTO를 같은 방식으로 직렬화/역직렬화할 수 있었고, Kotlin의 nullability와 default value를 데이터 모델에 자연스럽게 반영할 수 있어 응답 모델 관리가 단순했습니다 |
-| Kotlin Coroutines / Flow | 비동기 처리 | 종목 리스트 polling, connectivity 관찰, WebSocket 수신을 같은 비동기 추상화로 다룰 수 있었고, `StateFlow`와 `callbackFlow` 조합이 현재 구조와 잘 맞았습니다 |
+| Kotlin Coroutines / Flow | 비동기 처리 | 종목 리스트 초기 snapshot과 실시간 ticker 스트림, connectivity 관찰, 호가창 WebSocket 수신을 같은 비동기 추상화로 다룰 수 있었고, `StateFlow`와 `callbackFlow` 조합이 현재 구조와 잘 맞았습니다 |
 | Coil 3 | 코인 아이콘 로딩 | 종목 리스트의 코인 아이콘을 Compose에서 가볍게 표시하기 좋았고, OkHttp 기반 네트워크 스택과도 자연스럽게 연결할 수 있었습니다 |
 | MockK + Turbine + JUnit4 | 테스트 | repository와 ViewModel을 격리해 검증하기 쉬웠고, Flow 상태 전이, retry, 오프라인/소켓 오류 시나리오를 읽기 쉬운 형태로 테스트할 수 있었습니다 |
 
@@ -294,24 +295,24 @@ graph LR
 | 항목 | 결정 |
 |---|---|
 | 지원 마켓 | KRW / BTC / USDT |
-| 종목 리스트 갱신 | REST `/v1/ticker` polling |
+| 종목 리스트 갱신 | REST `/v1/ticker` 초기 조회 + WebSocket `ticker` 증분 반영 |
 | 호가창 갱신 | WebSocket only |
 | 기본 호가 단위 | 15단 |
 | 가격 포맷 | KRW는 정수 그룹 포맷, BTC/USDT는 최대 소수점 9자리 |
 | 수치 타입 | `Double` 유지 |
 | Preview 전략 | `src/debug`에 화면 상태별 Compose Preview 유지 |
 
-### 왜 종목 리스트는 Polling인가
+### 왜 종목 리스트는 REST + WebSocket인가
 
 종목 리스트와 호가창은 요구하는 실시간성의 성격이 다르다고 판단해 데이터 수집 전략을 분리했습니다.
 
-- 종목 리스트는 사용자가 탐색할 대상을 고르는 화면이므로, 과제 범위에서는 REST `ticker`를 1초 간격으로 갱신하는 편이 구현과 검증이 더 단순했습니다.
-- 호가창은 가격과 수량이 빠르게 변하는 핵심 화면이므로, 과제 요구사항에 맞춰 WebSocket만으로 실시간 갱신하도록 구현했습니다.
-- 리스트까지 대량 WebSocket 구독으로 확장할 수도 있었지만, 이번 과제에서는 연결 관리 복잡도를 호가창에 집중하는 쪽이 더 합리적이라고 판단했습니다.
+- 종목 리스트는 최초 진입 시 REST `ticker`로 빠르게 초기 snapshot을 구성합니다.
+- 그 이후에는 Upbit WebSocket `ticker`를 구독해 종목별 최신 현재가와 변동률을 실시간으로 반영합니다.
+- 호가창은 기존과 동일하게 WebSocket `orderbook` + `ticker` 조합으로 실시간 상태를 유지합니다.
 
-현재 종목 리스트 polling은 `StateFlow`와 `SharingStarted.WhileSubscribed(5_000)` 조합 위에서 동작하므로, 활성 구독이 사라지면 약 5초 뒤 중단됩니다. 따라서 화면이 비활성화된 뒤에도 무한히 polling을 유지하는 구조는 아닙니다.
+이 방식은 리스트 첫 렌더링 속도와 이후 실시간성 사이의 균형을 맞추기 위한 선택입니다. 초기 현재가는 REST 응답으로 빠르게 채우고, 이후 변경분만 WebSocket으로 반영하므로 1초 polling 대비 네트워크 사용량과 불필요한 전체 재조회 비용을 줄일 수 있습니다.
 
-이 선택의 트레이드오프도 분명합니다. 1초 polling은 구현 단순성과 빠른 검증에는 유리하지만, 네트워크 사용량과 배터리 효율 측면에서는 최적이 아닙니다. 이 부분은 `ROADMAP.md`에 후속 개선 항목으로 기록했습니다.
+현재 종목 리스트 스트림도 `StateFlow`와 `SharingStarted.WhileSubscribed(5_000)` 위에서 동작하므로, 화면 구독이 끊기면 약 5초 뒤 수집이 중단됩니다. 연결 복구 시에는 초기 snapshot을 다시 받고 WebSocket을 재구독해 최신 상태를 복원합니다.
 
 ---
 
@@ -325,7 +326,7 @@ graph LR
 - `NetworkStatusRepositoryImplTest`
   - connectivity flow 초기값과 전이
 - `MarketListViewModelTest`
-  - 초기 로딩 / 온라인 실패 / retry / polling 재개
+  - 초기 로딩 / 온라인 실패 / retry / WebSocket ticker 반영
 - `OrderBookViewModelTest`
   - 누적 `OrderBookEvent` 기반 상태 전이
   - `SocketError`, `Offline`, retry

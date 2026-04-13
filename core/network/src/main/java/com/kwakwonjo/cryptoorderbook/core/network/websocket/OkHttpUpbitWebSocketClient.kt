@@ -13,6 +13,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -36,7 +37,20 @@ class OkHttpUpbitWebSocketClient @Inject constructor(
     private val json: Json,
 ) : UpbitWebSocketClient {
 
-    override fun observeUpbitStream(subscription: UpbitSubscription): Flow<UpbitWsFrame> = callbackFlow {
+    override fun observeUpbitStream(subscription: UpbitSubscription): Flow<UpbitWsFrame> = observeSocket(
+        requestPayload = buildOrderBookPayload(subscription),
+        parseMessage = ::parseCompositeMessage,
+    )
+
+    override fun observeTickerStream(markets: List<String>): Flow<UpbitTickerFrame> = observeSocket(
+        requestPayload = buildTickerPayload(markets),
+        parseMessage = ::parseTickerMessage,
+    )
+
+    private fun <T> observeSocket(
+        requestPayload: String,
+        parseMessage: (String) -> T?,
+    ): Flow<T> = callbackFlow {
         val request = Request.Builder()
             .url(UPBIT_WEBSOCKET_URL)
             .build()
@@ -45,7 +59,7 @@ class OkHttpUpbitWebSocketClient @Inject constructor(
             request,
             object : WebSocketListener() {
                 override fun onOpen(webSocket: WebSocket, response: Response) {
-                    webSocket.send(buildRequestPayload(subscription))
+                    webSocket.send(requestPayload)
                 }
 
                 override fun onMessage(webSocket: WebSocket, text: String) {
@@ -67,7 +81,7 @@ class OkHttpUpbitWebSocketClient @Inject constructor(
         }
     }
 
-    private fun buildRequestPayload(subscription: UpbitSubscription): String {
+    private fun buildOrderBookPayload(subscription: UpbitSubscription): String {
         val payload = buildJsonArray {
             add(
                 buildJsonObject {
@@ -100,7 +114,35 @@ class OkHttpUpbitWebSocketClient @Inject constructor(
         return payload.toString()
     }
 
-    private fun parseMessage(rawMessage: String): UpbitWsFrame? {
+    private fun buildTickerPayload(markets: List<String>): String {
+        val payload = buildJsonArray {
+            add(
+                buildJsonObject {
+                    put("ticket", UUID.randomUUID().toString())
+                }
+            )
+            add(
+                buildJsonObject {
+                    put("type", "ticker")
+                    putJsonArray("codes") {
+                        markets.forEach { market ->
+                            add(JsonPrimitive(market))
+                        }
+                    }
+                    put("is_only_realtime", true)
+                }
+            )
+            add(
+                buildJsonObject {
+                    put("format", "DEFAULT")
+                }
+            )
+        }
+
+        return payload.toString()
+    }
+
+    private fun parseCompositeMessage(rawMessage: String): UpbitWsFrame? {
         val jsonElement = json.parseToJsonElement(rawMessage)
         val messageType = jsonElement.jsonObject["type"]?.jsonPrimitive?.contentOrNull ?: return null
 
@@ -123,18 +165,20 @@ class OkHttpUpbitWebSocketClient @Inject constructor(
                 )
             }
 
-            "ticker" -> {
-                val message = json.decodeFromJsonElement<UpbitTickerMessage>(jsonElement)
-                UpbitTickerFrame(
-                    market = message.code,
-                    tradePrice = message.tradePrice,
-                    signedChangeRate = message.signedChangeRate,
-                    timestamp = message.timestamp,
-                )
-            }
+            "ticker" -> parseTickerMessage(rawMessage)
 
             else -> null
         }
+    }
+
+    private fun parseTickerMessage(rawMessage: String): UpbitTickerFrame? {
+        val message = json.decodeFromString<UpbitTickerMessage>(rawMessage)
+        return UpbitTickerFrame(
+            market = message.code,
+            tradePrice = message.tradePrice,
+            signedChangeRate = message.signedChangeRate,
+            timestamp = message.timestamp,
+        )
     }
 
     private companion object {

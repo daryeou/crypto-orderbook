@@ -16,6 +16,7 @@ internal sealed interface MarketListContract {
     enum class UiStatus {
         IDLE,
         INITIAL_LOADING,
+        OFFLINE,
         ERROR
     }
 

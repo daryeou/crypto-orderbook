@@ -91,7 +91,11 @@ class MarketListViewModel @Inject constructor(
         MarketListContract.UiState(
             items = event.items,
             uiStatus = when {
-                event.isError || availability == NetworkAvailability.DISCONNECTED -> {
+                availability == NetworkAvailability.DISCONNECTED -> {
+                    MarketListContract.UiStatus.OFFLINE
+                }
+
+                event.isError -> {
                     MarketListContract.UiStatus.ERROR
                 }
 

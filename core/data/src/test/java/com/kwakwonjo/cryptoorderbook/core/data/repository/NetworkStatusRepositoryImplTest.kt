@@ -85,10 +85,36 @@ class NetworkStatusRepositoryImplTest {
         }
     }
 
-    private fun connectedCapabilities(): NetworkCapabilities {
+    @Test
+    fun `isNetworkAvailable treats transport-backed internet as connected`() {
+        val context = mockk<Context>()
+        val connectivityManager = mockk<ConnectivityManager>()
+        val network = mockk<Network>()
+        val capabilities = connectedCapabilities(validated = false, wifi = true)
+
+        every { context.getSystemService(Context.CONNECTIVITY_SERVICE) } returns connectivityManager
+        every { connectivityManager.activeNetwork } returns network
+        every { connectivityManager.getNetworkCapabilities(network) } returns capabilities
+
+        val repository = NetworkStatusRepositoryImpl(context)
+
+        assertEquals(true, repository.isNetworkAvailable())
+    }
+
+    private fun connectedCapabilities(
+        validated: Boolean = true,
+        wifi: Boolean = false,
+        cellular: Boolean = false,
+        ethernet: Boolean = false,
+        vpn: Boolean = false,
+    ): NetworkCapabilities {
         val capabilities = mockk<NetworkCapabilities>()
         every { capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) } returns true
-        every { capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) } returns true
+        every { capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) } returns validated
+        every { capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) } returns wifi
+        every { capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) } returns cellular
+        every { capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) } returns ethernet
+        every { capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) } returns vpn
         return capabilities
     }
 
@@ -96,6 +122,10 @@ class NetworkStatusRepositoryImplTest {
         val capabilities = mockk<NetworkCapabilities>()
         every { capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) } returns true
         every { capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) } returns false
+        every { capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) } returns false
+        every { capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) } returns false
+        every { capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) } returns false
+        every { capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) } returns false
         return capabilities
     }
 }

@@ -12,7 +12,9 @@ import com.kwakwonjo.cryptoorderbook.core.domain.usecase.ObserveConnectivityUseC
 import com.kwakwonjo.cryptoorderbook.core.model.NetworkAvailability
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -37,7 +39,7 @@ class MarketListViewModelTest {
             assertEquals(
                 MarketListContract.UiState(
                     items = emptyList(),
-                    uiStatus = MarketListContract.UiStatus.ERROR,
+                    uiStatus = MarketListContract.UiStatus.OFFLINE,
                 ),
                 awaitItem(),
             )
@@ -153,7 +155,7 @@ class MarketListViewModelTest {
             assertEquals(
                 MarketListContract.UiState(
                     items = listOf(marketItem(firstMarkets[0], firstTickers[0])),
-                    uiStatus = MarketListContract.UiStatus.ERROR,
+                    uiStatus = MarketListContract.UiStatus.OFFLINE,
                 ),
                 awaitItem(),
             )
@@ -184,6 +186,59 @@ class MarketListViewModelTest {
                 ),
                 repository.fetchTickerListRequests,
             )
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `success state applies websocket ticker updates after initial snapshot`() = runTest {
+        val markets = listOf(
+            market("KRW-BTC", "Bitcoin KRW", "Bitcoin"),
+            market("KRW-ETH", "Ethereum KRW", "Ethereum"),
+        )
+        val initialTickers = listOf(
+            ticker("KRW-BTC", tradePrice = 148_956_000.0, signedChangeRate = 0.0031),
+            ticker("KRW-ETH", tradePrice = 5_486_000.0, signedChangeRate = -0.0124),
+        )
+        val updatedTicker = ticker("KRW-BTC", tradePrice = 149_100_000.0, signedChangeRate = 0.0042)
+        val tickerUpdates = MutableSharedFlow<Ticker>(extraBufferCapacity = 1)
+        val repository = FakeMarketRepository().apply {
+            enqueueMarketListSuccess(markets)
+            enqueueTickerListSuccess(initialTickers)
+            enqueueTickerUpdates(tickerUpdates)
+        }
+        val viewModel = createViewModel(
+            repository = repository,
+            networkStatusRepository = FakeNetworkStatusRepository(NetworkAvailability.CONNECTED),
+        )
+
+        viewModel.uiState.test {
+            assertEquals(
+                MarketListContract.UiState(
+                    items = listOf(
+                        marketItem(markets[0], initialTickers[0]),
+                        marketItem(markets[1], initialTickers[1]),
+                    ),
+                    uiStatus = MarketListContract.UiStatus.IDLE,
+                ),
+                awaitItem(),
+            )
+
+            tickerUpdates.tryEmit(updatedTicker)
+            runCurrent()
+
+            assertEquals(
+                MarketListContract.UiState(
+                    items = listOf(
+                        marketItem(markets[0], updatedTicker),
+                        marketItem(markets[1], initialTickers[1]),
+                    ),
+                    uiStatus = MarketListContract.UiStatus.IDLE,
+                ),
+                awaitItem(),
+            )
+
+            assertEquals(listOf(listOf("KRW-BTC", "KRW-ETH")), repository.observeTickerUpdateRequests)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -323,11 +378,13 @@ class MarketListViewModelTest {
     private class FakeMarketRepository : MarketRepository {
         private val marketListResults = ArrayDeque<MarketListResult>()
         private val tickerListResults = ArrayDeque<TickerListResult>()
+        private val tickerUpdateFlows = ArrayDeque<Flow<Ticker>>()
 
         var fetchMarketListCalls: Int = 0
             private set
 
         val fetchTickerListRequests = mutableListOf<List<String>>()
+        val observeTickerUpdateRequests = mutableListOf<List<String>>()
 
         override suspend fun fetchMarketList(): List<Market> {
             fetchMarketListCalls += 1
@@ -345,6 +402,11 @@ class MarketListViewModelTest {
             }
         }
 
+        override fun observeTickerUpdates(markets: List<String>): Flow<Ticker> {
+            observeTickerUpdateRequests += markets
+            return tickerUpdateFlows.removeFirstOrNull() ?: emptyFlow()
+        }
+
         fun enqueueMarketListSuccess(markets: List<Market>) {
             marketListResults.addLast(MarketListResult.Success(markets))
         }
@@ -355,6 +417,10 @@ class MarketListViewModelTest {
 
         fun enqueueTickerListFailure(throwable: Throwable) {
             tickerListResults.addLast(TickerListResult.Failure(throwable))
+        }
+
+        fun enqueueTickerUpdates(flow: Flow<Ticker>) {
+            tickerUpdateFlows.addLast(flow)
         }
     }
 

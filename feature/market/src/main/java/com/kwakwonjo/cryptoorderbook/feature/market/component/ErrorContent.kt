@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.annotation.StringRes
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -26,6 +27,8 @@ import com.kwakwonjo.cryptoorderbook.feature.market.R
 
 @Composable
 internal fun ErrorContent(
+    @StringRes titleRes: Int,
+    @StringRes descriptionRes: Int,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -43,14 +46,14 @@ internal fun ErrorContent(
         )
         VerticalSpacer(16.dp)
         Text(
-            text = stringResource(R.string.error_network_title),
+            text = stringResource(titleRes),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
         )
         VerticalSpacer(8.dp)
         Text(
-            text = stringResource(R.string.error_network_desc),
+            text = stringResource(descriptionRes),
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant

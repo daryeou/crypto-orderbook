@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.kwakwonjo.cryptoorderbook.core.designsystem.theme.CryptoAppTheme
+import com.kwakwonjo.cryptoorderbook.feature.market.R
 
 @Preview(name = "Search Empty", showBackground = true, backgroundColor = 0xFF141416)
 @Composable
@@ -40,6 +41,8 @@ private fun EmptyContentPreview() {
 private fun ErrorContentPreview() {
     PreviewTheme {
         ErrorContent(
+            titleRes = R.string.error_network_title,
+            descriptionRes = R.string.error_network_desc,
             onRetry = {},
             modifier = Modifier,
         )

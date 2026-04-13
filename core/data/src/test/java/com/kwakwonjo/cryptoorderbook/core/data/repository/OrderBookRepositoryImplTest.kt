@@ -10,6 +10,7 @@ import com.kwakwonjo.cryptoorderbook.core.network.model.UpbitWsFrame
 import com.kwakwonjo.cryptoorderbook.core.network.websocket.UpbitWebSocketClient
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import java.io.IOException
@@ -135,6 +136,8 @@ class OrderBookRepositoryImplTest {
         private val flow: Flow<UpbitWsFrame>,
     ) : UpbitWebSocketClient {
         override fun observeUpbitStream(subscription: UpbitSubscription): Flow<UpbitWsFrame> = flow
+
+        override fun observeTickerStream(markets: List<String>): Flow<UpbitTickerFrame> = emptyFlow()
     }
 }
 

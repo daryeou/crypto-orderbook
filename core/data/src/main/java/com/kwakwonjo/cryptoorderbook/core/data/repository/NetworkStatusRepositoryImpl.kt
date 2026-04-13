@@ -62,10 +62,7 @@ class NetworkStatusRepositoryImpl @Inject constructor(
         val activeNetwork = connectivityManager.activeNetwork ?: return false
         val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false
 
-        // NET_CAPABILITY_INTERNET: 인터넷 통신용으로 구성된 네트워크인지 확인한다.
-        // NET_CAPABILITY_VALIDATED: 외부 인터넷 연결이 실제로 검증된 상태인지 확인한다.
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        return capabilities.isConnected()
     }
 
     private fun ConnectivityManager.currentNetworkAvailability(): NetworkAvailability {
@@ -75,13 +72,15 @@ class NetworkStatusRepositoryImpl @Inject constructor(
     }
 
     private fun NetworkCapabilities.toNetworkAvailability(): NetworkAvailability {
-        return if (
-            hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-            hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-        ) {
+        return if (isConnected()) {
             NetworkAvailability.CONNECTED
         } else {
             NetworkAvailability.DISCONNECTED
         }
+    }
+
+    private fun NetworkCapabilities.isConnected(): Boolean {
+        return hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 }

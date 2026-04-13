@@ -95,6 +95,17 @@ internal fun MarketListScreen(
 
                 MarketListContract.UiStatus.ERROR -> {
                     ErrorContent(
+                        titleRes = R.string.error_market_load_title,
+                        descriptionRes = R.string.error_market_load_desc,
+                        onRetry = onRetry,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+
+                MarketListContract.UiStatus.OFFLINE -> {
+                    ErrorContent(
+                        titleRes = R.string.error_network_title,
+                        descriptionRes = R.string.error_network_desc,
                         onRetry = onRetry,
                         modifier = Modifier.weight(1f),
                     )
