@@ -41,15 +41,6 @@
 
 ## Preview
 
-대표 기능 GIF를 이 섹션에 붙일 수 있도록 자리와 파일 경로를 미리 정리해 두었습니다.
-
-- GIF 저장 경로: `docs/readme-assets/gifs/`
-- 권장 파일명:
-  - `market-list-overview.gif`
-  - `market-list-search-sort.gif`
-  - `orderbook-realtime.gif`
-  - `offline-and-retry.gif`
-
 <table>
   <tr>
     <td width="50%" valign="top">
