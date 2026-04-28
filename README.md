@@ -305,13 +305,13 @@ graph LR
 
 ### 호가창 UI 렌더링 주기 최적화 (100ms)
 
-웹소켓을 통해 실시간으로 쏟아지는 오더북(호가창) 데이터를 그대로 UI에 그릴 경우 심각한 성능 저하가 발생합니다. 이를 방지하기 위해 데이터 샘플링 주기를 **100ms**(`OrderBookSample = 100L`)로 제한하는 아키텍처 결정을 내렸습니다.
+웹소켓을 통해 실시간으로 쏟아지는 오더북(호가창) 데이터를 그대로 UI에 그릴 경우 심각한 성능 저하가 발생합니다. 이를 방지하기 위해 데이터 샘플링 주기를 **100ms**(`OrderBookSample`)로 제한하는 아키텍처 결정을 내렸습니다.
 
 1. **UX(사용자 경험) 향상**: 인간의 시각은 100ms(0.1초) 이하의 빠른 텍스트 변화를 제대로 인지하지 못합니다. 제한 없이 렌더링이 발생하면 글자가 뭉개져 보이는 플리커링(Flickering) 현상으로 인해 시각적 피로도만 높아집니다.
-2. **성능과 배터리 효율**: 초당 수백 번 데이터가 갱신될 때마다 Compose의 불필요한 Recomposition이 폭주하면 CPU/메모리 부하가 걸리며 모바일 배터리가 급격히 소모됩니다.
-3. **비즈니스의 본질 보장**: 암호화폐 투자자에게 100ms의 시차는 지연을 느끼지 못하는 완벽한 '실시간성(Real-time)'으로 간주되면서도 투자 타이밍을 뺏지 않는 마지노선입니다.
+2. **성능과 배터리 효율**: 초당 수백 번 데이터가 갱신될 때마다 Compose의 불필요한 Recomposition이 발생하여 배터리가 소모됩니다.
+3. **비즈니스의 본질 보장**: 암호화폐 투자자에게 100ms의 시차는 지연을 느끼기 어려운 '실시간성(Real-time)'으로 간주되면서도 투자 타이밍을 뺏지 않는 마지노선입니다.
 
-이러한 성능과 비즈니스 요구사항의 트레이드오프(Trade-off)를 고려하여, Coroutines Flow의 연산자를 통해 이벤트를 100ms 단위로 그룹화(Sampling/Debouncing)하여 UI 렌더링을 최적화했습니다.
+이러한 성능과 비즈니스 요구사항의 Trade-off를 고려하여, Coroutines Flow의 연산자를 통해 이벤트를 100ms 단위로 Sampling하여 UI 렌더링을 최적화했습니다.
 
 ### 왜 종목 리스트는 REST + WebSocket인가
 
@@ -324,6 +324,19 @@ graph LR
 이 방식은 리스트 첫 렌더링 속도와 이후 실시간성 사이의 균형을 맞추기 위한 선택입니다. 초기 현재가는 REST 응답으로 빠르게 채우고, 이후 변경분만 WebSocket으로 반영하므로 1초 polling 대비 네트워크 사용량과 불필요한 전체 재조회 비용을 줄일 수 있습니다.
 
 현재 종목 리스트 스트림도 `StateFlow`와 `SharingStarted.WhileSubscribed(5_000)` 위에서 동작하므로, 화면 구독이 끊기면 약 5초 뒤 수집이 중단됩니다. 연결 복구 시에는 초기 snapshot을 다시 받고 WebSocket을 재구독해 최신 상태를 복원합니다.
+
+---
+
+## Troubleshooting
+
+### Upbit Ticker REST API의 400 Bad Request 에러 대응
+
+- **문제 상황**: 초기 시세(Snapshot)를 조회하기 위해 `market/all`로 가져온 수많은 마켓 코드(약 300개 이상)를 `GET /v1/ticker?markets=...` 요청에 한 번에 묶어서 보냈을 때 `400 Bad Request` 에러가 간헐적으로 발생했습니다.
+- **원인 분석**: 웹 서버(Tomcat 등)나 방화벽은 보안상 URL의 최대 길이(보통 4KB 내외)를 제한하고 있습니다. 모든 코인 종목을 URI Parameter로 연결하면 문자열이 너무 길어져 서버가 요청을 거부하는 것이 문제였습니다.
+- **해결 방법**: 
+  - `MarketRepositoryImpl` 내부에서 마켓 리스트를 **100개 단위로 자르는 Chunking**을 추가했습니다.
+  - Kotlin Coroutines의 `async` 배열과 `awaitAll()`을 결합하여, 분할된 청크 단위의 요청들을 병렬로 호출한 뒤 클라이언트에서 `flatten()`으로 하나로 병합하여 반환하도록 설계했습니다.
+- **아키텍처적 의도**: 이 URL 길이 제한이라는 'REST API의 한계'를 ViewModel이 알게 된다면 계층 규칙이 무너지게 됩니다. 따라서 이를 Repository 내부에 캡슐화하여, 호출하는 ViewModel 입장에선 내부가 Chunk로 잘렸는지 모른 채 투명하게 호출할 수 있도록 유지보수성을 확보했습니다.
 
 ---
 
@@ -348,6 +361,12 @@ graph LR
 ./gradlew testDebugUnitTest
 ./gradlew assembleDebug
 ```
+
+---
+
+## Commit Convention
+
+[Conventional Commits](https://www.conventionalcommits.org/) 규칙을 따르며, `feat` / `fix` / `perf` / `refactor` / `docs` / `chore` 등 타입으로 변경 의도를 분리해 기록합니다.
 
 ---
 
