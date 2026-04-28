@@ -65,7 +65,7 @@
 
 - Kotlin + Jetpack Compose
 - Upbit 우선 검토
-- Clean Architecture(data/domain/ui) + MVVM + StateFlow
+- Clean Architecture(data/domain/ui) + MVVM
 - Coroutines + Flow, WebSocket은 `callbackFlow` 우선
 - Retrofit + OkHttp WebSocket
 - Hilt
