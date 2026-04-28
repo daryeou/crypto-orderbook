@@ -83,7 +83,7 @@
 
 ### Quick Install
 
-- APK 다운로드: [coinx_v1.1.0.apk](https://github.com/daryeou/crypto-orderbook/releases/download/v1.1.0/coinx_v1.1.0.apk)
+- APK 다운로드: [coinx_v1.1.1.apk](https://github.com/daryeou/crypto-orderbook/releases/download/v1.1.1/coinx_v1.1.1.apk)
 - Android 기기에서 설치 후 바로 실행할 수 있습니다.
 
 ### Environment
