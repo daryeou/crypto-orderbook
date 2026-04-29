@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.onStart
@@ -57,6 +56,7 @@ class OrderBookViewModel @AssistedInject constructor(
             },
         )
 
+    @OptIn(FlowPreview::class)
     private val orderBookFlow: Flow<OrderBookEvent> = combine(
         refreshTrigger.onStart { emit(Unit) },
         networkAvailability
